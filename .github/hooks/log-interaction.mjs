@@ -97,6 +97,10 @@ const event = {
   timestamp: new Date().toISOString(),
   phase,
   sessionId,
+  agent: payload.agent ?? payload.agent_name ?? payload.agentName ?? null,
+  mode: payload.mode ?? payload.agent_mode ?? payload.agentMode ?? null,
+  skill: payload.skill ?? payload.skill_name ?? payload.skillName ?? null,
+  ai_tool_name: payload.ai_tool_name ?? payload.aiToolName ?? null,
   prompt:
     payload.prompt ??
     payload.prompt_text ??
@@ -158,10 +162,23 @@ if (phase === "Stop" || phase === "SessionEnd") {
       result: entry.toolResult,
     }));
 
+  const distinctValues = (field) => [
+    ...new Map(
+      events
+        .map((entry) => entry[field])
+        .filter((value) => value != null)
+        .map((value) => [JSON.stringify(value), value]),
+    ).values(),
+  ];
+
   const summary = {
     timestamp: new Date().toISOString(),
     sessionId,
     prompt,
+    agent: distinctValues("agent"),
+    mode: distinctValues("mode"),
+    skill: distinctValues("skill"),
+    ai_tool_name: distinctValues("ai_tool_name"),
     tool: tools,
     actionTook,
     error: errors.length ? errors : null,
