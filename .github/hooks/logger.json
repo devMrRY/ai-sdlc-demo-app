@@ -1,0 +1,58 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/log-interaction.mjs SessionStart"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/log-interaction.mjs UserPromptSubmit"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/log-interaction.mjs PreToolUse"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/log-interaction.mjs PostToolUse"
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/log-interaction.mjs PostToolUseFailure"
+      }
+    ],
+    "SubagentStart": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/log-interaction.mjs SubagentStart"
+      }
+    ],
+    "SubagentStop": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/log-interaction.mjs SubagentStop"
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/log-interaction.mjs Stop"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/log-interaction.mjs SessionEnd"
+      }
+    ]
+  }
+}
