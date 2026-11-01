@@ -57,7 +57,7 @@ public class ApprovalService
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
-            throw new ArgumentException("A reason is required to reject an invoice.", nameof(reason));
+            throw new ArgumentException("A reason is required to reject an invoice.");
         }
 
         return _repository.ExecuteAtomically(invoiceId, currentInvoice =>

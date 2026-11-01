@@ -425,19 +425,58 @@ public class ApprovalServiceTests
     [Fact]
     public void Reject_RecordsReasonAndApprover()
     {
-        var service = ServiceFor(InvoiceWith("INV-1", InvoiceStatus.PendingApproval));
+        var invoice = InvoiceWith("INV-1", InvoiceStatus.PendingApproval);
+        var originalApprovalHistory = invoice.ApprovalHistory.ToList();
+        var service = ServiceFor(invoice);
 
         var result = service.Reject("INV-1", "demo.approver", "Duplicate invoice");
 
         Assert.Equal(InvoiceStatus.Rejected, result.Status);
+        Assert.Equal("demo.approver", result.DecidedBy);
+        Assert.NotNull(result.DecidedAt);
         Assert.Equal("Duplicate invoice", result.DecisionNote);
+        Assert.Equal(originalApprovalHistory, result.ApprovalHistory);
     }
 
-    [Fact]
-    public void Reject_RequiresAReason()
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Reject_RequiresAReasonWithoutMutation(string reason)
     {
-        var service = ServiceFor(InvoiceWith("INV-1", InvoiceStatus.PendingApproval));
+        var invoice = InvoiceWith("INV-1", InvoiceStatus.PendingApproval);
+        invoice.DecidedBy = "previous.actor";
+        invoice.DecidedAt = DateTime.UtcNow.AddMinutes(-1);
+        invoice.DecisionNote = "Existing decision data";
+        invoice.ApprovalHistory.Add(
+            new ApprovalRecord("first.manager", "Manager", DateTime.UtcNow.AddMinutes(-2)));
+        var originalState = SnapshotInvoice(invoice);
+        var service = ServiceFor(invoice);
 
-        Assert.Throws<ArgumentException>(() => service.Reject("INV-1", "demo.approver", "  "));
+        var exception = Assert.Throws<ArgumentException>(
+            () => service.Reject("INV-1", "demo.approver", reason));
+
+        Assert.Equal("A reason is required to reject an invoice.", exception.Message);
+        AssertInvoiceUnchanged(originalState, invoice);
+    }
+
+    [Theory]
+    [InlineData(InvoiceStatus.Approved)]
+    [InlineData(InvoiceStatus.Rejected)]
+    public void Reject_AlreadyFinalizedInvoice_FailsWithoutMutation(InvoiceStatus status)
+    {
+        var invoice = InvoiceWith("INV-1", status);
+        invoice.DecidedBy = "previous.actor";
+        invoice.DecidedAt = DateTime.UtcNow.AddMinutes(-1);
+        invoice.DecisionNote = status == InvoiceStatus.Rejected ? "Previous rejection" : null;
+        invoice.ApprovalHistory.Add(
+            new ApprovalRecord("first.manager", "Manager", DateTime.UtcNow.AddMinutes(-2)));
+        var originalState = SnapshotInvoice(invoice);
+        var service = ServiceFor(invoice);
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => service.Reject("INV-1", "demo.approver", "Another reason"));
+
+        Assert.Contains("only pending invoices", exception.Message);
+        AssertInvoiceUnchanged(originalState, invoice);
     }
 }

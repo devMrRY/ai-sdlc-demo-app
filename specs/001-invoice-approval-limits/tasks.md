@@ -89,7 +89,7 @@
 - [x] T034 [US2] Review the finalized pending-first-approval model and API contract for invoices above `500,000` in `backend/src/InvoiceApp.Domain/Invoice.cs` and the approval controller contract; keep the design minimal, domain-owned, and aligned with the server-authenticated user identity
 - [x] T035 [US2] Implement the multi-approver validation in `backend/src/InvoiceApp.Domain/ApprovalService.cs` for invoices above `500,000`, ensuring the first approval can be from either `Manager` or `Director`, the second approver is a distinct `Director`, and the same user cannot approve twice
 - [x] T036 [US2] Reject invalid second-approver role attempts and same-user approval attempts before any status or decision mutation in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
-- [x] T037 [US2] Reject attempts on already-finalized invoices and preserve the original invoice state in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
+- [x] T037 [US2] Reject approval attempts on already-finalized invoices, including `Rejected` invoices, and preserve the original invoice state in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
 - [x] T038 [US2] Keep controller logic thin and pass server-authenticated approver identity through `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs` without trusting client-supplied usernames
 - [x] T039 [US2] Keep UI updates minimal and non-authoritative in `backend/src/InvoiceApp.Api/wwwroot/app.js` or related UI assets; no business logic is allowed in the browser
 - [x] T040 [US2] Validate the full high-value approval sequence and the explicit rejection paths before commit, including same-user, wrong-role, invalid ordering, and unchanged state assertions, and review the API and UI error clarity
@@ -107,20 +107,20 @@
 
 ### Tests for User Story 3
 
-- [ ] T043 [US3] Add backend test for blank rejection reason rejection in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T044 [US3] Add backend test for invalid approval attempts preserving invoice status, approval history, decision metadata, and other relevant state in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T045 [US3] Add backend test asserting invalid approval attempts do not add approval records or change decision metadata in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T046 [US3] Add backend test verifying explicit invoice rejection still transitions to `Rejected` according to the existing rejection rules in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [x] T043 [US3] Add backend test for blank rejection reason rejection in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [x] T044 [US3] Add backend test for invalid approval attempts preserving invoice status, approval history, decision metadata, and other relevant state in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [x] T045 [US3] Add backend test asserting invalid approval attempts do not add approval records or change decision metadata in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [x] T046 [US3] Add backend test verifying explicit invoice rejection still transitions to `Rejected` according to the existing rejection rules in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
 
 ### Implementation for User Story 3
 
-- [ ] T047 [US3] Ensure invalid approval or rejection requests return clear reasons and never partially update invoice state in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
-- [ ] T048 [US3] Preserve invoice status, approval history, actor metadata, timestamps, and decision-note data on invalid approval attempts, while keeping rejection logic separate from approval validation in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
-- [ ] T049 [US3] Enforce rejection-message validation and invalid rejection path checks in the domain layer before any write operation, without conflating them with the >`500,000` approval-order rules in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
-- [ ] T050 [US3] Keep API behavior aligned with controller mapping and session-based auth in `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs`
-- [ ] T051 [US3] Review the state-preservation assertions and confirm they are limited to invalid approval and rejection integrity without duplicating US1 or US2 role, threshold, or duplicate-approver coverage
-- [ ] T052 [US3] Copilot completes the US3 implementation, runs the relevant backend tests, presents the review report, and waits for explicit human approval before any commit is created
-- [ ] T053 [US3] Commit milestone only after human approval: `Preserve invoice state and rejection integrity on invalid approvals`
+- [x] T047 [US3] Ensure invalid approval or rejection requests return clear reasons and never partially update invoice state in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
+- [x] T048 [US3] Preserve invoice status, approval history, actor metadata, timestamps, and decision-note data on invalid approval attempts, while keeping rejection logic separate from approval validation in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
+- [x] T049 [US3] Enforce rejection-message validation and reject attempts on already-Approved invoices in the domain layer before any write operation, without conflating them with the >`500,000` approval-order rules in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
+- [x] T050 [US3] Keep API behavior aligned with controller mapping and session-based auth, including rejection of approval attempts on `Rejected` invoices and rejection attempts on `Approved` invoices without state mutation, in `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs`
+- [x] T051 [US3] Review the state-preservation assertions and confirm they are limited to invalid approval and rejection integrity without duplicating US1 or US2 role, threshold, or duplicate-approver coverage
+- [x] T052 [US3] Copilot completes the US3 implementation, runs the relevant backend tests, presents the review report, and waits for explicit human approval before any commit is created
+- [x] T053 [US3] Commit milestone only after human approval: `Preserve invoice state and rejection integrity on invalid approvals`
 
 **Checkpoint**: User Story 3 should be complete, independently validated, and committed only after explicit human approval of the US3 review report.
 

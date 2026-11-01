@@ -63,7 +63,14 @@
 
   function renderPending(pending) {
     show('pending-empty', pending.length === 0);
+    const canDecide = session.role === 'Manager' || session.role === 'Director';
     $('pending-list').replaceChildren(...pending.map((invoice) => {
+      if (!canDecide) {
+        return el('li', {},
+          el('span', {}, `${invoice.id} · ${invoice.customerName} · ${money.format(invoice.amount)}`),
+          el('span', {}, 'Only Managers and Directors can approve or reject invoices.'));
+      }
+
       const reasonId = `reason-${invoice.id}`;
       const approve = el('button', { type: 'button', 'aria-label': `Approve invoice ${invoice.id}` }, 'Approve');
       const reject = el('button', { type: 'button', class: 'danger', 'aria-label': `Reject invoice ${invoice.id}` }, 'Reject');

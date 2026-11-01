@@ -21,7 +21,7 @@ public class ApprovalsController : ApiControllerBase
     [RequireRole(
         "Manager",
         "Director",
-        ForbiddenMessage = "A Manager or Director role is required to approve the invoice.")]
+        ForbiddenMessage = "A Manager or Director role is required to perform this operation.")]
     public ActionResult<Invoice> Approve(string invoiceId) =>
         Handle(() =>
         {
@@ -30,7 +30,10 @@ public class ApprovalsController : ApiControllerBase
         });
 
     [HttpPost("{invoiceId}/reject")]
-    [RequireRole("Approver", "Admin")]
+    [RequireRole(
+        "Manager",
+        "Director",
+        ForbiddenMessage = "A Manager or Director role is required to perform this operation.")]
     public ActionResult<Invoice> Reject(string invoiceId, [FromBody] RejectRequest request) =>
         Handle(() => _approvals.Reject(invoiceId, HttpContext.GetSession().Username, request.Reason));
 }

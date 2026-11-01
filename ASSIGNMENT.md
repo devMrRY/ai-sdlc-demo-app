@@ -44,6 +44,10 @@ The last two rules are where an agent is most likely to produce something that l
 - The rejection response must clearly explain why the attempt failed.
 - A rejected attempt must leave the invoice state unchanged.
 - Failed approval attempts must not partially update approval history or other invoice state.
+- An already-Rejected invoice must not be eligible for approval.
+- An already-Approved invoice must not be eligible for rejection.
+- Only users with the Manager or Director role may perform invoice approval or rejection. Approver, Admin, and unsupported roles remain able to authenticate if configured, but must be forbidden from these operations.
+- Forbidden invoice approval or rejection requests return HTTP 403 with `A Manager or Director role is required to perform this operation.` and leave invoice state unchanged.
 
 ### Boundary cases
 
@@ -54,7 +58,7 @@ Explicitly test amounts at and around the limits:
 - 500,000
 - Just above 500,000
 
-Also test duplicate approvers, incorrect approver roles, invalid approval order, and attempts to approve an already-finalized invoice where applicable.
+Also test duplicate approvers, incorrect approver roles, invalid approval order, attempts to approve an already-Rejected invoice, and attempts to reject an already-Approved invoice.
 
 Use the monetary type and conventions already established in the application. Do not introduce unrelated business rules.
 
@@ -70,7 +74,7 @@ Known project locations:
 - `e2e` — Playwright end-to-end tests.
 - `AGENTS.md` — existing repository-level agent instructions.
 
-The existing application uses Approver and Admin roles in its demonstration UI. Inspect the current role model before implementing Manager and Director permissions. Reuse existing conventions where possible, and document any necessary role-model changes.
+The configured demo users include Approver, Admin, Manager, and Director roles. Preserve the Approver and Admin demo users and allow them to sign in; only Manager and Director may approve or reject invoices. Reuse existing conventions and keep these role permissions consistent in the API, UI, and tests.
 
 The repo reference is:
 
@@ -243,6 +247,8 @@ The assignment explicitly requires tests for:
 - Incorrect approver roles
 - Invalid approval order
 - Already-finalized invoice attempts
+- Approval attempts on already-Rejected invoices
+- Rejection attempts on already-Approved invoices
 - Clear rejection reason and no state mutation on rejected attempts
 
 ## 10. Context and Handoff Files

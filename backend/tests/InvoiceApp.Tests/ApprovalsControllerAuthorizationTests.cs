@@ -33,10 +33,29 @@ public class ApprovalsControllerAuthorizationTests
         Assert.NotNull(host.GetInvoice().DecidedAt);
     }
 
+    [Fact]
+    public async Task Approve_RejectedInvoice_ReturnsConflictWithoutMutation()
+    {
+        using var host = new ApiTestHost(
+            "Manager",
+            "manager.user",
+            initialStatus: InvoiceStatus.Rejected);
+
+        var response = await host.Client.PostAsync(
+            $"/api/approvals/{host.Invoice.Id}/approve",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Contains("only pending invoices", body.GetProperty("error").GetString());
+        AssertInvoiceUnchanged(host);
+        response.Dispose();
+    }
+
     [Theory]
     [InlineData("Manager", "manager.user")]
     [InlineData("Director", "director.user")]
-    public async Task Reject_ApprovalRoles_ForbiddenWithoutMutation(string role, string username)
+    public async Task Reject_ApprovalRoles_RejectsInvoice(string role, string username)
     {
         using var host = new ApiTestHost(role, username);
 
@@ -44,37 +63,34 @@ public class ApprovalsControllerAuthorizationTests
             $"/api/approvals/{host.Invoice.Id}/reject",
             new ApprovalsController.RejectRequest("Not permitted"));
 
-        AssertForbiddenAndUnchanged(response, host);
-    }
-
-    [Fact]
-    public async Task Approve_UnsupportedRole_ForbiddenWithoutMutation()
-    {
-        using var host = new ApiTestHost("Auditor", "auditor.user");
-
-        var response = await host.Client.PostAsync(
-            $"/api/approvals/{host.Invoice.Id}/approve",
-            content: null);
-
-        await AssertApprovalForbiddenAndUnchanged(response, host);
-    }
-
-    [Fact]
-    public async Task Approve_ApproverRole_ForbiddenWithoutMutation()
-    {
-        using var host = new ApiTestHost("Approver", "approver.user");
-
-        var response = await host.Client.PostAsync(
-            $"/api/approvals/{host.Invoice.Id}/approve",
-            content: null);
-
-        await AssertApprovalForbiddenAndUnchanged(response, host);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(InvoiceStatus.Rejected, host.GetInvoice().Status);
+        Assert.Equal(username, host.GetInvoice().DecidedBy);
+        Assert.Equal("Not permitted", host.GetInvoice().DecisionNote);
+        Assert.NotNull(host.GetInvoice().DecidedAt);
+        response.Dispose();
     }
 
     [Theory]
     [InlineData("Approver", "approver.user")]
     [InlineData("Admin", "admin.user")]
-    public async Task Reject_RejectionRoles_RejectsInvoice(string role, string username)
+    [InlineData("Auditor", "auditor.user")]
+    public async Task Approve_UnauthorizedRole_ForbiddenWithoutMutation(string role, string username)
+    {
+        using var host = new ApiTestHost(role, username);
+
+        var response = await host.Client.PostAsync(
+            $"/api/approvals/{host.Invoice.Id}/approve",
+            content: null);
+
+        await AssertOperationForbiddenAndUnchanged(response, host);
+    }
+
+    [Theory]
+    [InlineData("Approver", "approver.user")]
+    [InlineData("Admin", "admin.user")]
+    [InlineData("Auditor", "auditor.user")]
+    public async Task Reject_UnauthorizedRole_ForbiddenWithoutMutation(string role, string username)
     {
         using var host = new ApiTestHost(role, username);
 
@@ -82,25 +98,44 @@ public class ApprovalsControllerAuthorizationTests
             $"/api/approvals/{host.Invoice.Id}/reject",
             new ApprovalsController.RejectRequest("Duplicate invoice"));
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(InvoiceStatus.Rejected, host.GetInvoice().Status);
-        Assert.Equal(username, host.GetInvoice().DecidedBy);
-        Assert.Equal("Duplicate invoice", host.GetInvoice().DecisionNote);
-        Assert.NotNull(host.GetInvoice().DecidedAt);
+        await AssertOperationForbiddenAndUnchanged(response, host);
     }
 
-    [Theory]
-    [InlineData("Approver", "approver.user")]
-    [InlineData("Admin", "admin.user")]
-    public async Task Approve_RejectionRoles_ForbiddenWithoutMutation(string role, string username)
+    [Fact]
+    public async Task Reject_ApprovedInvoice_ReturnsConflictWithoutMutation()
     {
-        using var host = new ApiTestHost(role, username);
+        using var host = new ApiTestHost(
+            "Director",
+            "director.user",
+            initialStatus: InvoiceStatus.Approved);
 
-        var response = await host.Client.PostAsync(
-            $"/api/approvals/{host.Invoice.Id}/approve",
-            content: null);
+        var response = await host.Client.PostAsJsonAsync(
+            $"/api/approvals/{host.Invoice.Id}/reject",
+            new ApprovalsController.RejectRequest("Attempted rejection"));
 
-        await AssertApprovalForbiddenAndUnchanged(response, host);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Contains("only pending invoices", body.GetProperty("error").GetString());
+        AssertInvoiceUnchanged(host);
+        response.Dispose();
+    }
+
+    [Fact]
+    public async Task Reject_BlankReason_ReturnsBadRequestAndPreservesInvoice()
+    {
+        using var host = new ApiTestHost("Manager", "manager.user");
+
+        var response = await host.Client.PostAsJsonAsync(
+            $"/api/approvals/{host.Invoice.Id}/reject",
+            new ApprovalsController.RejectRequest("  "));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(
+            "A reason is required to reject an invoice.",
+            body.GetProperty("error").GetString());
+        AssertInvoiceUnchanged(host);
+        response.Dispose();
     }
 
     [Fact]
@@ -196,23 +231,14 @@ public class ApprovalsControllerAuthorizationTests
             second => Assert.Equal(("director.user", "Director"), (second.Approver, second.Role)));
     }
 
-    private static void AssertForbiddenAndUnchanged(
-        HttpResponseMessage response,
-        ApiTestHost host)
-    {
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        AssertInvoiceUnchanged(host);
-        response.Dispose();
-    }
-
-    private static async Task AssertApprovalForbiddenAndUnchanged(
+    private static async Task AssertOperationForbiddenAndUnchanged(
         HttpResponseMessage response,
         ApiTestHost host)
     {
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(
-            "A Manager or Director role is required to approve the invoice.",
+            "A Manager or Director role is required to perform this operation.",
             body.GetProperty("error").GetString());
         AssertInvoiceUnchanged(host);
         response.Dispose();
@@ -262,16 +288,32 @@ public class ApprovalsControllerAuthorizationTests
         private readonly TestServer _server;
         private readonly SessionStore _sessions;
 
-        public ApiTestHost(string? role = null, string? username = null, decimal amount = 100m)
+        public ApiTestHost(
+            string? role = null,
+            string? username = null,
+            decimal amount = 100m,
+            InvoiceStatus initialStatus = InvoiceStatus.PendingApproval)
         {
             Invoices = new InMemoryInvoiceRepository();
-            Invoice = Invoices.Add(new Invoice
+            var invoice = new Invoice
             {
                 Id = "INV-AUTH-1",
                 CustomerName = "Authorization test invoice",
                 Amount = amount,
-                Status = InvoiceStatus.PendingApproval,
-            });
+                Status = initialStatus,
+                DecidedBy = initialStatus == InvoiceStatus.PendingApproval ? null : "previous.approver",
+                DecidedAt = initialStatus == InvoiceStatus.PendingApproval
+                    ? null
+                    : DateTime.UtcNow.AddMinutes(-1),
+                DecisionNote = initialStatus == InvoiceStatus.Rejected ? "Previous rejection" : null,
+            };
+            if (initialStatus != InvoiceStatus.PendingApproval)
+            {
+                invoice.ApprovalHistory.Add(
+                    new ApprovalRecord("first.manager", "Manager", DateTime.UtcNow.AddMinutes(-2)));
+            }
+
+            Invoice = Invoices.Add(invoice);
             InitialInvoiceSnapshot = SnapshotInvoice(Invoice);
 
             _sessions = new SessionStore();
