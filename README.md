@@ -19,6 +19,10 @@ A small invoice approval application used to demonstrate specification-driven, A
 - [Demo and evidence](#demo-and-evidence)
 - [Evidence and current limitations](#evidence-and-current-limitations)
 - [Github repo link](https://github.com/devMrRY/ai-sdlc-demo-app/tree/feature/us3-invoice-rejection-workflow)
+- [zip file with demo video](https://nagarro-my.sharepoint.com/:u:/p/rahul_yadav06/IQBzGzB9JkKpR5_8OegoiMXHAcdX5WLdjqp_loDsPYidEd4?e=qcZzXE)
+
+**Note**: zip file with demo video link is accessible to nagarro employee id only
+
 ## Project overview
 
 The business problem is to make invoice decisions according to role-based financial authority while retaining an auditable approval history. The application demonstrates a four-state invoice lifecycle:
