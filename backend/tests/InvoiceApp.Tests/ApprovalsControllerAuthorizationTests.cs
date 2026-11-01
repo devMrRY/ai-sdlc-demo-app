@@ -56,7 +56,7 @@ public class ApprovalsControllerAuthorizationTests
             $"/api/approvals/{host.Invoice.Id}/approve",
             content: null);
 
-        AssertForbiddenAndUnchanged(response, host);
+        await AssertApprovalForbiddenAndUnchanged(response, host);
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public class ApprovalsControllerAuthorizationTests
             $"/api/approvals/{host.Invoice.Id}/approve",
             content: null);
 
-        AssertForbiddenAndUnchanged(response, host);
+        await AssertApprovalForbiddenAndUnchanged(response, host);
     }
 
     [Theory]
@@ -100,7 +100,7 @@ public class ApprovalsControllerAuthorizationTests
             $"/api/approvals/{host.Invoice.Id}/approve",
             content: null);
 
-        AssertForbiddenAndUnchanged(response, host);
+        await AssertApprovalForbiddenAndUnchanged(response, host);
     }
 
     [Fact]
@@ -146,11 +146,74 @@ public class ApprovalsControllerAuthorizationTests
         AssertInvoiceUnchanged(host);
     }
 
+    [Fact]
+    public async Task Approve_HighValueFlow_UsesAuthenticatedSessionForBothApprovals()
+    {
+        using var host = new ApiTestHost("Manager", "manager.user", amount: 600_001m);
+
+        var firstResponse = await host.Client.PostAsJsonAsync(
+            $"/api/approvals/{host.Invoice.Id}/approve",
+            new { username = "forged.director", role = "Director" });
+
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        var provisionalInvoice = await firstResponse.Content.ReadFromJsonAsync<Invoice>();
+        Assert.NotNull(provisionalInvoice);
+        Assert.Equal(InvoiceStatus.PendingApproval, provisionalInvoice.Status);
+        Assert.Null(provisionalInvoice.DecidedBy);
+        Assert.Null(provisionalInvoice.DecidedAt);
+        var firstApproval = Assert.Single(provisionalInvoice.ApprovalHistory);
+        Assert.Equal("manager.user", firstApproval.Approver);
+        Assert.Equal("Manager", firstApproval.Role);
+
+        var stateAfterFirstApproval = SnapshotInvoice(host.GetInvoice());
+        host.SetSession("Manager", "second.manager");
+        var invalidSecondResponse = await host.Client.PostAsJsonAsync(
+            $"/api/approvals/{host.Invoice.Id}/approve",
+            new { username = "forged.director", role = "Director" });
+
+        Assert.Equal(HttpStatusCode.Conflict, invalidSecondResponse.StatusCode);
+        Assert.Contains(
+            "Director",
+            (await invalidSecondResponse.Content.ReadFromJsonAsync<JsonElement>())
+                .GetProperty("error")
+                .GetString());
+        AssertInvoiceUnchanged(stateAfterFirstApproval, host.GetInvoice());
+
+        host.SetSession("Director", "director.user");
+        var secondResponse = await host.Client.PostAsJsonAsync(
+            $"/api/approvals/{host.Invoice.Id}/approve",
+            new { username = "forged.manager", role = "Manager" });
+
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        var approvedInvoice = await secondResponse.Content.ReadFromJsonAsync<Invoice>();
+        Assert.NotNull(approvedInvoice);
+        Assert.Equal(InvoiceStatus.Approved, approvedInvoice.Status);
+        Assert.Equal("director.user", approvedInvoice.DecidedBy);
+        Assert.NotNull(approvedInvoice.DecidedAt);
+        Assert.Collection(
+            approvedInvoice.ApprovalHistory,
+            first => Assert.Equal(("manager.user", "Manager"), (first.Approver, first.Role)),
+            second => Assert.Equal(("director.user", "Director"), (second.Approver, second.Role)));
+    }
+
     private static void AssertForbiddenAndUnchanged(
         HttpResponseMessage response,
         ApiTestHost host)
     {
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        AssertInvoiceUnchanged(host);
+        response.Dispose();
+    }
+
+    private static async Task AssertApprovalForbiddenAndUnchanged(
+        HttpResponseMessage response,
+        ApiTestHost host)
+    {
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(
+            "A Manager or Director role is required to approve the invoice.",
+            body.GetProperty("error").GetString());
         AssertInvoiceUnchanged(host);
         response.Dispose();
     }
@@ -164,18 +227,40 @@ public class ApprovalsControllerAuthorizationTests
         response.Dispose();
     }
 
-    private static void AssertInvoiceUnchanged(ApiTestHost host)
+    private static Invoice SnapshotInvoice(Invoice invoice) =>
+        new()
+        {
+            Id = invoice.Id,
+            CustomerName = invoice.CustomerName,
+            Amount = invoice.Amount,
+            Status = invoice.Status,
+            CreatedAt = invoice.CreatedAt,
+            DecidedBy = invoice.DecidedBy,
+            DecidedAt = invoice.DecidedAt,
+            DecisionNote = invoice.DecisionNote,
+            ApprovalHistory = invoice.ApprovalHistory.ToList(),
+        };
+
+    private static void AssertInvoiceUnchanged(ApiTestHost host) =>
+        AssertInvoiceUnchanged(host.InitialInvoiceSnapshot, host.GetInvoice());
+
+    private static void AssertInvoiceUnchanged(Invoice expected, Invoice actual)
     {
-        var invoice = host.GetInvoice();
-        Assert.Equal(InvoiceStatus.PendingApproval, invoice.Status);
-        Assert.Null(invoice.DecidedBy);
-        Assert.Null(invoice.DecidedAt);
-        Assert.Null(invoice.DecisionNote);
+        Assert.Equal(expected.Id, actual.Id);
+        Assert.Equal(expected.CustomerName, actual.CustomerName);
+        Assert.Equal(expected.Amount, actual.Amount);
+        Assert.Equal(expected.Status, actual.Status);
+        Assert.Equal(expected.CreatedAt, actual.CreatedAt);
+        Assert.Equal(expected.DecidedBy, actual.DecidedBy);
+        Assert.Equal(expected.DecidedAt, actual.DecidedAt);
+        Assert.Equal(expected.DecisionNote, actual.DecisionNote);
+        Assert.Equal(expected.ApprovalHistory, actual.ApprovalHistory);
     }
 
     private sealed class ApiTestHost : IDisposable
     {
         private readonly TestServer _server;
+        private readonly SessionStore _sessions;
 
         public ApiTestHost(string? role = null, string? username = null, decimal amount = 100m)
         {
@@ -187,15 +272,16 @@ public class ApprovalsControllerAuthorizationTests
                 Amount = amount,
                 Status = InvoiceStatus.PendingApproval,
             });
+            InitialInvoiceSnapshot = SnapshotInvoice(Invoice);
 
-            var sessions = new SessionStore();
+            _sessions = new SessionStore();
             var builder = new WebHostBuilder()
                 .ConfigureServices(services =>
                 {
                     services
                         .AddControllers()
                         .AddApplicationPart(typeof(ApprovalsController).Assembly);
-                    services.AddSingleton(sessions);
+                    services.AddSingleton(_sessions);
                     services.AddSingleton<IInvoiceRepository>(Invoices);
                     services.AddScoped<ApprovalService>();
                 })
@@ -211,19 +297,25 @@ public class ApprovalsControllerAuthorizationTests
 
             if (role is not null && username is not null)
             {
-                var token = sessions.Create(new UserSession(username, role));
-                Client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", token);
+                SetSession(role, username);
             }
         }
 
         public HttpClient Client { get; }
         public InMemoryInvoiceRepository Invoices { get; }
         public Invoice Invoice { get; }
+        public Invoice InitialInvoiceSnapshot { get; }
 
         public Invoice GetInvoice() =>
             Invoices.GetById(Invoice.Id)
             ?? throw new InvalidOperationException($"Test invoice {Invoice.Id} disappeared.");
+
+        public void SetSession(string role, string username)
+        {
+            var token = _sessions.Create(new UserSession(username, role));
+            Client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+        }
 
         public void Dispose()
         {

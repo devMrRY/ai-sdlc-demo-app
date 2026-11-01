@@ -1,8 +1,7 @@
 namespace InvoiceApp.Domain;
 
 /// <summary>
-/// Moves an invoice through its lifecycle: Draft -> PendingApproval -> Approved or Rejected.
-/// One invoice at a time, decided as a whole by a single approver.
+/// Moves invoices through submission, approval, and rejection.
 /// </summary>
 public class ApprovalService
 {
@@ -15,30 +14,43 @@ public class ApprovalService
 
     public Invoice Submit(string invoiceId)
     {
-        var invoice = Find(invoiceId);
-
-        if (invoice.Status != InvoiceStatus.Draft)
+        return _repository.ExecuteAtomically(invoiceId, currentInvoice =>
         {
-            throw new InvalidOperationException(
-                $"Invoice {invoiceId} is {invoice.Status}; only drafts can be submitted.");
-        }
+            var invoice = Find(currentInvoice, invoiceId);
 
-        invoice.Status = InvoiceStatus.PendingApproval;
-        _repository.Update(invoice);
-        return invoice;
+            if (invoice.Status != InvoiceStatus.Draft)
+            {
+                throw new InvalidOperationException(
+                    $"Invoice {invoiceId} is {invoice.Status}; only drafts can be submitted.");
+            }
+
+            invoice.Status = InvoiceStatus.PendingApproval;
+            _repository.Update(invoice);
+            return invoice;
+        });
     }
 
     public Invoice Approve(string invoiceId, string approver, string role)
     {
-        var invoice = Find(invoiceId);
-        EnsurePending(invoice);
-        EnsureApprovalAllowed(invoice, role);
+        return _repository.ExecuteAtomically(invoiceId, currentInvoice =>
+        {
+            var invoice = Find(currentInvoice, invoiceId);
+            EnsurePending(invoice);
 
-        invoice.Status = InvoiceStatus.Approved;
-        invoice.DecidedBy = approver;
-        invoice.DecidedAt = DateTime.UtcNow;
-        _repository.Update(invoice);
-        return invoice;
+            if (invoice.Amount > 500_000m)
+            {
+                return ApproveHighValueInvoice(invoice, approver, role);
+            }
+
+            EnsureApprovalAllowed(invoice, role);
+            EnsureNoExistingApprovalHistory(invoice);
+
+            var approvedAt = DateTime.UtcNow;
+            invoice.ApprovalHistory.Add(new ApprovalRecord(approver, role, approvedAt));
+            FinalizeApproval(invoice, approver, approvedAt);
+            _repository.Update(invoice);
+            return invoice;
+        });
     }
 
     public Invoice Reject(string invoiceId, string approver, string reason)
@@ -48,19 +60,22 @@ public class ApprovalService
             throw new ArgumentException("A reason is required to reject an invoice.", nameof(reason));
         }
 
-        var invoice = Find(invoiceId);
-        EnsurePending(invoice);
+        return _repository.ExecuteAtomically(invoiceId, currentInvoice =>
+        {
+            var invoice = Find(currentInvoice, invoiceId);
+            EnsurePending(invoice);
 
-        invoice.Status = InvoiceStatus.Rejected;
-        invoice.DecidedBy = approver;
-        invoice.DecidedAt = DateTime.UtcNow;
-        invoice.DecisionNote = reason;
-        _repository.Update(invoice);
-        return invoice;
+            invoice.Status = InvoiceStatus.Rejected;
+            invoice.DecidedBy = approver;
+            invoice.DecidedAt = DateTime.UtcNow;
+            invoice.DecisionNote = reason;
+            _repository.Update(invoice);
+            return invoice;
+        });
     }
 
-    private Invoice Find(string invoiceId) =>
-        _repository.GetById(invoiceId)
+    private static Invoice Find(Invoice? invoice, string invoiceId) =>
+        invoice
         ?? throw new KeyNotFoundException($"Invoice {invoiceId} was not found.");
 
     private static void EnsurePending(Invoice invoice)
@@ -92,5 +107,63 @@ public class ApprovalService
         };
 
         throw new InvalidOperationException(reason);
+    }
+
+    private Invoice ApproveHighValueInvoice(Invoice invoice, string approver, string role)
+    {
+        if (invoice.ApprovalHistory.Count == 0)
+        {
+            if (role is not ("Manager" or "Director"))
+            {
+                throw new InvalidOperationException(
+                    $"Role '{role}' is not authorized to provide a provisional approval.");
+            }
+
+            invoice.ApprovalHistory.Add(
+                new ApprovalRecord(approver, role, DateTime.UtcNow));
+            _repository.Update(invoice);
+            return invoice;
+        }
+
+        if (invoice.ApprovalHistory.Count != 1)
+        {
+            throw new InvalidOperationException(
+                "The pending invoice has an invalid approval history.");
+        }
+
+        var firstApproval = invoice.ApprovalHistory[0];
+        if (string.Equals(firstApproval.Approver, approver, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "The second approval must be made by a different user.");
+        }
+
+        if (role != "Director")
+        {
+            throw new InvalidOperationException(
+                "The second approver for invoices above 500000 must be a Director.");
+        }
+
+        var approvedAt = DateTime.UtcNow;
+        invoice.ApprovalHistory.Add(new ApprovalRecord(approver, role, approvedAt));
+        FinalizeApproval(invoice, approver, approvedAt);
+        _repository.Update(invoice);
+        return invoice;
+    }
+
+    private static void EnsureNoExistingApprovalHistory(Invoice invoice)
+    {
+        if (invoice.ApprovalHistory.Count != 0)
+        {
+            throw new InvalidOperationException(
+                "A single-approval invoice cannot already have approval history.");
+        }
+    }
+
+    private static void FinalizeApproval(Invoice invoice, string approver, DateTime approvedAt)
+    {
+        invoice.Status = InvoiceStatus.Approved;
+        invoice.DecidedBy = approver;
+        invoice.DecidedAt = approvedAt;
     }
 }

@@ -56,6 +56,14 @@ public class InMemoryInvoiceRepository : IInvoiceRepository
         }
     }
 
+    public T ExecuteAtomically<T>(string id, Func<Invoice?, T> operation)
+    {
+        lock (_lock)
+        {
+            return operation(_invoices.FirstOrDefault(invoice => invoice.Id == id));
+        }
+    }
+
     public bool Remove(string id)
     {
         lock (_lock) return _invoices.RemoveAll(i => i.Id == id) > 0;

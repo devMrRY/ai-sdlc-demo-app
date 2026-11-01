@@ -68,12 +68,21 @@
       const approve = el('button', { type: 'button', 'aria-label': `Approve invoice ${invoice.id}` }, 'Approve');
       const reject = el('button', { type: 'button', class: 'danger', 'aria-label': `Reject invoice ${invoice.id}` }, 'Reject');
       const reason = el('input', { id: reasonId, 'aria-label': `Rejection reason for ${invoice.id}`, placeholder: 'Reason (required to reject)' });
+      const approvalHistory = invoice.approvalHistory || [];
+      const approvalProgress = approvalHistory.length === 1
+        ? el(
+          'span',
+          { role: 'status' },
+          `Provisional approval recorded by ${approvalHistory[0].approver} (${approvalHistory[0].role}). Awaiting a different Director.`
+        )
+        : null;
 
       approve.addEventListener('click', () => decide(`/approvals/${invoice.id}/approve`, {}));
       reject.addEventListener('click', () => decide(`/approvals/${invoice.id}/reject`, { reason: reason.value }));
 
       return el('li', {},
         el('span', {}, `${invoice.id} · ${invoice.customerName} · ${money.format(invoice.amount)}`),
+        ...(approvalProgress ? [approvalProgress] : []),
         el('span', {}, approve),
         el('div', { class: 'reject-row' }, reason, reject));
     }));
