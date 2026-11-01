@@ -28,10 +28,11 @@ public class ApprovalService
         return invoice;
     }
 
-    public Invoice Approve(string invoiceId, string approver)
+    public Invoice Approve(string invoiceId, string approver, string role)
     {
         var invoice = Find(invoiceId);
         EnsurePending(invoice);
+        EnsureApprovalAllowed(invoice, role);
 
         invoice.Status = InvoiceStatus.Approved;
         invoice.DecidedBy = approver;
@@ -69,5 +70,27 @@ public class ApprovalService
             throw new InvalidOperationException(
                 $"Invoice {invoice.Id} is {invoice.Status}; only pending invoices can be decided.");
         }
+    }
+
+    private static void EnsureApprovalAllowed(Invoice invoice, string role)
+    {
+        if (role == "Manager" && invoice.Amount <= 50_000m)
+        {
+            return;
+        }
+
+        if (role == "Director" && invoice.Amount <= 500_000m)
+        {
+            return;
+        }
+
+        var reason = role switch
+        {
+            "Manager" => "Managers may approve invoices only up to 50000.",
+            "Director" => "Directors may approve invoices only up to 500000 in a single approval.",
+            _ => $"Role '{role}' is not authorized to approve invoices.",
+        };
+
+        throw new InvalidOperationException(reason);
     }
 }

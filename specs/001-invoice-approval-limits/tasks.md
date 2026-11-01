@@ -46,23 +46,24 @@
 
 ### Tests for User Story 1
 
-- [ ] T013 [US1] Add backend test coverage for `Manager` approval at `50,000` succeeding in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T014 [US1] Add backend test coverage for `Manager` approval at `50,001` failing without mutating invoice state in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T015 [US1] Add backend test coverage for `Director` approval at `50,001` succeeding in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T016 [US1] Add backend test coverage for `Director` approval at `500,000` succeeding in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T017 [US1] Add backend test coverage for a `Manager` approval attempt at `500,000` failing without mutating invoice state and for invalid role or unauthorized approval attempts with clear rejection reasons in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [x] T013 [US1] Add backend test coverage for `Manager` approval at `50,000` succeeding in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [x] T014 [US1] Add backend test coverage for `Manager` approval at `50,001` failing without mutating invoice state in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [x] T015 [US1] Add backend test coverage for `Director` approval below `50,000` and at `50,001` succeeding in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [x] T016 [US1] Add backend test coverage for `Director` approval at `500,000` succeeding in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [x] T017 [US1] Add backend test coverage for a `Manager` approval attempt at `500,000` and a single `Director` approval attempt at `500,001` failing without mutating invoice state, and for invalid role or unauthorized approval attempts with clear rejection reasons in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] Implement amount-based role authorization in `backend/src/InvoiceApp.Domain/ApprovalService.cs` for `Manager` up to and including `50,000` and `Director` up to and including `500,000`
-- [ ] T019 [US1] Ensure the valid single-approval role limits remain enforced in `backend/src/InvoiceApp.Domain/ApprovalService.cs`: `Manager` may approve up to and including `50,000`, `Director` may approve up to and including `500,000`, and `Manager` approvals above `50,000` fail before any invoice mutation
-- [ ] T020 [US1] Preserve invoice status, approval history, decision metadata, and all invoice fields on rejected approval attempts in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
-- [ ] T021 [US1] Keep the controller contract thin and map service failures through `backend/src/InvoiceApp.Api/Controllers/ApiControllerBase.cs` and `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs`
-- [ ] T022 [US1] Update the runtime demo-user configuration in `backend/src/InvoiceApp.Api/appsettings.json` to include the required `Manager` and `Director` demo users before testing or sign-in
-- [ ] T023 [US1] Verify the HTTP and domain error behavior for invalid approvals remains consistent with the projectÃ¢â‚¬â„¢s 404/409/400 mapping conventions in `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs`
-- [ ] T024 [US1] Review the US1 boundary tests and state-preservation semantics before commit, ensuring the story remains limited to legitimate single-approval thresholds and does not duplicate the >`500,000` two-approver enforcement rules
-- [ ] T025 [US1] Copilot completes the US1 implementation, runs the relevant backend tests, presents the review report, and waits for explicit human approval before any commit is created
-- [ ] T026 [US1] Commit milestone only after human approval: `Add Manager and Director approval thresholds and role checks`
+- [x] T018 [US1] Implement amount-based role authorization in `backend/src/InvoiceApp.Domain/ApprovalService.cs` for `Manager` up to and including `50,000` and `Director` for any valid amount up to and including `500,000`
+- [x] T019 [US1] Ensure the valid single-approval role limits remain enforced in `backend/src/InvoiceApp.Domain/ApprovalService.cs`: `Manager` may approve up to and including `50,000`, `Director` may approve any valid amount up to and including `500,000`, and `Manager` approvals above `50,000` fail before any invoice mutation
+- [x] T020 [US1] Preserve invoice status, approval history, decision metadata, and all invoice fields on rejected approval attempts in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
+- [x] T021 [US1] Keep the controller contract thin and map service failures through `backend/src/InvoiceApp.Api/Controllers/ApiControllerBase.cs` and `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs`
+- [x] T022 [US1] Update the runtime demo-user configuration in `backend/src/InvoiceApp.Api/appsettings.json` to include the required `Manager` and `Director` demo users before testing or sign-in
+- [x] T023 [US1] Verify the HTTP and domain error behavior for invalid approvals remains consistent with the projectÃ¢â‚¬â„¢s 404/409/400 mapping conventions in `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs`
+- [x] T024 [US1] Add and execute a Playwright E2E test in `e2e/tests/` using a page object in `e2e/pages/`: sign in as `demo.manager` through the UI, create and submit an invoice with amount greater than `50,000` and no greater than `500,000`, attempt approval through the UI, assert a clear rejection message and `PendingApproval` status, and verify no final decision is recorded; depends on T018–T023
+- [x] T025 [US1] Review the US1 boundary tests and state-preservation semantics before commit, ensuring the story remains limited to legitimate single-approval thresholds and does not duplicate the >`500,000` two-approver enforcement rules
+- [x] T026 [US1] Copilot completes the US1 implementation, runs the relevant backend tests, presents the review report, and waits for explicit human approval before any commit is created
+- [ ] T027 [US1] Commit milestone only after human approval: `Add Manager and Director approval thresholds and role checks`
 
 **Checkpoint**: User Story 1 should be fully functional, independently testable, and ready only after explicit human approval of the US1 review report.
 
@@ -76,24 +77,24 @@
 
 ### Tests for User Story 2
 
-- [ ] T027 [US2] Add backend test for a `Director` first approval above `500,000`, followed by a failed `Manager` second approval with a clear API error and no mutation, then a different `Director` second approval succeeds and the invoice becomes `Approved` in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T028 [US2] Add backend test for `Manager` Ã¢â€ â€™ `Director` approval above `500,000` succeeding in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T029 [US2] Add backend test for `Director` Ã¢â€ â€™ `Director` approval above `500,000` succeeding when the users are distinct in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T030 [US2] Add backend test for `Manager` Ã¢â€ â€™ `Manager` above `500,000` failing and leaving the invoice as `PendingApproval` in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T031 [US2] Add backend test for `Director` Ã¢â€ â€™ `Manager` above `500,000` failing and leaving the invoice as `PendingApproval`, and add coverage for the same user attempting a second approval and for a single `Director` approval above `500,000` leaving the invoice as `PendingApproval` in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T032 [US2] Add Playwright E2E coverage for a rejected over-limit approval through the UI in `e2e/tests/` and `e2e/pages/` using accessible role-based locators; assert the rejection reason is displayed and the invoice remains unchanged
+- [ ] T028 [US2] Add backend test for a `Director` first approval above `500,000`, followed by a failed `Manager` second approval with a clear API error and no mutation, then a different `Director` second approval succeeds and the invoice becomes `Approved` in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [ ] T029 [US2] Add backend test for `Manager` Ã¢â€ â€™ `Director` approval above `500,000` succeeding in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [ ] T030 [US2] Add backend test for `Director` Ã¢â€ â€™ `Director` approval above `500,000` succeeding when the users are distinct in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [ ] T031 [US2] Add backend test for `Manager` Ã¢â€ â€™ `Manager` above `500,000` failing and leaving the invoice as `PendingApproval` in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [ ] T032 [US2] Add backend test for `Director` Ã¢â€ â€™ `Manager` above `500,000` failing and leaving the invoice as `PendingApproval`, and add coverage for the same user attempting a second approval and for a single `Director` approval above `500,000` leaving the invoice as `PendingApproval` in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [ ] T033 [US2] Add Playwright E2E coverage for the >`500,000` two-approver flow through the UI in `e2e/tests/` and `e2e/pages/` using accessible role-based locators; verify the invoice stays pending after the first approval and reaches `Approved` only after a distinct Director second approval
 
 ### Implementation for User Story 2
 
-- [ ] T033 [US2] Review the finalized pending-first-approval model and API contract for invoices above `500,000` in `backend/src/InvoiceApp.Domain/Invoice.cs` and the approval controller contract; keep the design minimal, domain-owned, and aligned with the server-authenticated user identity
-- [ ] T034 [US2] Implement the multi-approver validation in `backend/src/InvoiceApp.Domain/ApprovalService.cs` for invoices above `500,000`, ensuring the first approval can be from either `Manager` or `Director`, the second approver is a distinct `Director`, and the same user cannot approve twice
-- [ ] T035 [US2] Reject invalid second-approver role attempts and same-user approval attempts before any status or decision mutation in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
-- [ ] T036 [US2] Reject attempts on already-finalized invoices and preserve the original invoice state in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
-- [ ] T037 [US2] Keep controller logic thin and pass server-authenticated approver identity through `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs` without trusting client-supplied usernames
-- [ ] T038 [US2] Keep UI updates minimal and non-authoritative in `backend/src/InvoiceApp.Api/wwwroot/app.js` or related UI assets; no business logic is allowed in the browser
-- [ ] T039 [US2] Validate the full high-value approval sequence and the explicit rejection paths before commit, including same-user, wrong-role, invalid ordering, and unchanged state assertions, and review the API and UI error clarity
-- [ ] T040 [US2] Copilot completes the US2 implementation, runs the relevant backend and E2E tests, presents the review report, and waits for explicit human approval before any commit is created
-- [ ] T041 [US2] Commit milestone only after human approval: `Enforce two-approver Director approval rules above 500k`
+- [ ] T034 [US2] Review the finalized pending-first-approval model and API contract for invoices above `500,000` in `backend/src/InvoiceApp.Domain/Invoice.cs` and the approval controller contract; keep the design minimal, domain-owned, and aligned with the server-authenticated user identity
+- [ ] T035 [US2] Implement the multi-approver validation in `backend/src/InvoiceApp.Domain/ApprovalService.cs` for invoices above `500,000`, ensuring the first approval can be from either `Manager` or `Director`, the second approver is a distinct `Director`, and the same user cannot approve twice
+- [ ] T036 [US2] Reject invalid second-approver role attempts and same-user approval attempts before any status or decision mutation in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
+- [ ] T037 [US2] Reject attempts on already-finalized invoices and preserve the original invoice state in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
+- [ ] T038 [US2] Keep controller logic thin and pass server-authenticated approver identity through `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs` without trusting client-supplied usernames
+- [ ] T039 [US2] Keep UI updates minimal and non-authoritative in `backend/src/InvoiceApp.Api/wwwroot/app.js` or related UI assets; no business logic is allowed in the browser
+- [ ] T040 [US2] Validate the full high-value approval sequence and the explicit rejection paths before commit, including same-user, wrong-role, invalid ordering, and unchanged state assertions, and review the API and UI error clarity
+- [ ] T041 [US2] Copilot completes the US2 implementation, runs the relevant backend and E2E tests, presents the review report, and waits for explicit human approval before any commit is created
+- [ ] T042 [US2] Commit milestone only after human approval: `Enforce two-approver Director approval rules above 500k`
 
 **Checkpoint**: User Story 2 should be independently testable and committed only after explicit human approval of the US2 design and implementation review report.
 
@@ -106,20 +107,20 @@
 
 ### Tests for User Story 3
 
-- [ ] T042 [US3] Add backend test for blank rejection reason rejection in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T043 [US3] Add backend test for invalid approval attempts preserving invoice status, approval history, decision metadata, and other relevant state in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T044 [US3] Add backend test asserting invalid approval attempts do not add approval records or change decision metadata in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
-- [ ] T045 [US3] Add backend test verifying explicit invoice rejection still transitions to `Rejected` according to the existing rejection rules in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [ ] T043 [US3] Add backend test for blank rejection reason rejection in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [ ] T044 [US3] Add backend test for invalid approval attempts preserving invoice status, approval history, decision metadata, and other relevant state in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [ ] T045 [US3] Add backend test asserting invalid approval attempts do not add approval records or change decision metadata in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- [ ] T046 [US3] Add backend test verifying explicit invoice rejection still transitions to `Rejected` according to the existing rejection rules in `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
 
 ### Implementation for User Story 3
 
-- [ ] T046 [US3] Ensure invalid approval or rejection requests return clear reasons and never partially update invoice state in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
-- [ ] T047 [US3] Preserve invoice status, approval history, actor metadata, timestamps, and decision-note data on invalid approval attempts, while keeping rejection logic separate from approval validation in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
-- [ ] T048 [US3] Enforce rejection-message validation and invalid rejection path checks in the domain layer before any write operation, without conflating them with the >`500,000` approval-order rules in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
-- [ ] T049 [US3] Keep API behavior aligned with controller mapping and session-based auth in `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs`
-- [ ] T050 [US3] Review the state-preservation assertions and confirm they are limited to invalid approval and rejection integrity without duplicating US1 or US2 role, threshold, or duplicate-approver coverage
-- [ ] T051 [US3] Copilot completes the US3 implementation, runs the relevant backend tests, presents the review report, and waits for explicit human approval before any commit is created
-- [ ] T052 [US3] Commit milestone only after human approval: `Preserve invoice state and rejection integrity on invalid approvals`
+- [ ] T047 [US3] Ensure invalid approval or rejection requests return clear reasons and never partially update invoice state in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
+- [ ] T048 [US3] Preserve invoice status, approval history, actor metadata, timestamps, and decision-note data on invalid approval attempts, while keeping rejection logic separate from approval validation in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
+- [ ] T049 [US3] Enforce rejection-message validation and invalid rejection path checks in the domain layer before any write operation, without conflating them with the >`500,000` approval-order rules in `backend/src/InvoiceApp.Domain/ApprovalService.cs`
+- [ ] T050 [US3] Keep API behavior aligned with controller mapping and session-based auth in `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs`
+- [ ] T051 [US3] Review the state-preservation assertions and confirm they are limited to invalid approval and rejection integrity without duplicating US1 or US2 role, threshold, or duplicate-approver coverage
+- [ ] T052 [US3] Copilot completes the US3 implementation, runs the relevant backend tests, presents the review report, and waits for explicit human approval before any commit is created
+- [ ] T053 [US3] Commit milestone only after human approval: `Preserve invoice state and rejection integrity on invalid approvals`
 
 **Checkpoint**: User Story 3 should be complete, independently validated, and committed only after explicit human approval of the US3 review report.
 
@@ -129,11 +130,11 @@
 
 **Purpose**: Run the required backend, UI, and mutation validation only after all three stories are complete and individually approved.
 
-- [ ] T053 Run the backend suite with `dotnet test backend/InvoiceApp.sln` and confirm all approval-limit, negative-path, and invalid-state tests pass
-- [ ] T054 Run the Playwright E2E suite with `cd e2e && npm install && npx playwright install chromium && npm test` and confirm the rejected over-limit UI scenario passes while checking both the displayed rejection reason and unchanged invoice state
-- [ ] T055 Run mutation testing with the installed global Stryker 4.13.0 against the domain approval logic and matching test project, without reinstalling or altering project dependencies
-- [ ] T056 Review mutation survivors, uncovered negative paths, and story-specific test gaps before final sign-off
-- [ ] T057 Final review checkpoint: verify all three user stories remain in three separate commits, the approved specification and plan remain unchanged, and the implementation is ready for final human approval
+- [ ] T054 Run the backend suite with `dotnet test backend/InvoiceApp.sln` and confirm all approval-limit, negative-path, and invalid-state tests pass
+- [ ] T055 Run the Playwright E2E suite with `cd e2e && npm install && npx playwright install chromium && npm test` and confirm the rejected over-limit UI scenario passes while checking both the displayed rejection reason and unchanged invoice state
+- [ ] T056 Run mutation testing with the installed global Stryker 4.13.0 against the domain approval logic and matching test project, without reinstalling or altering project dependencies
+- [ ] T057 Review mutation survivors, uncovered negative paths, and story-specific test gaps before final sign-off
+- [ ] T058 Final review checkpoint: verify all three user stories remain in three separate commits, the approved specification and plan remain unchanged, and the implementation is ready for final human approval
 
 ---
 
@@ -159,7 +160,7 @@
 - Setup tasks T002ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“T004 can proceed in parallel once the approval checkpoint is complete.
 - Foundational tasks T006ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“T009 can proceed in parallel after the baseline review is complete.
 - Story tests within the same user story may be drafted in parallel, but task labels remain single-story only when they touch the same file and could conflict.
-- Final validation tasks T053ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“T055 are independent and can proceed in parallel after all stories are approved and committed.
+- Final validation tasks T055-T056 are independent and can proceed in parallel after all stories are approved and committed.
 
 ---
 

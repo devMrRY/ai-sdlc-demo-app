@@ -166,7 +166,7 @@ These support the approved specification rather than replacing it.
 - Add required `Manager` and `Director` runtime users to `appsettings.json`.
 - Enforce thresholds in `ApprovalService`:
   - Manager allowed up to and including `50,000`
-  - Director allowed up to and including `500,000`
+  - Director allowed for any valid invoice amount up to and including `500,000`, including amounts at or below `50,000`
 - Reject invalid role/amount combinations with a clear reason.
 - Preserve invoice state on all invalid approval attempts.
 
@@ -176,25 +176,31 @@ These support the approved specification rather than replacing it.
 - `backend/src/InvoiceApp.Api/Controllers/ApprovalsController.cs`
 - `backend/src/InvoiceApp.Api/appsettings.json`
 - `backend/tests/InvoiceApp.Tests/ApprovalServiceTests.cs`
+- `e2e/pages/` and `e2e/tests/` for the required Manager over-limit browser test
 
 **Files to create**
-- No new architecture files are required during this milestone.
+- No new architecture or runtime infrastructure files are required. Add the test and page object within the existing Playwright directories.
 
 **Domain / API / UI responsibilities**
 - Domain: threshold and role validation before any mutation.
 - API: keep the session-driven controller contract and map service failures using `ApiControllerBase.Handle(...)`.
-- UI: minimal error messaging only; no business rules in JavaScript.
+- UI: minimal error messaging only; no business rules in JavaScript. The Playwright test exercises the existing login, invoice creation/submission, and approval controls through the browser.
 
 **Required tests**
 - Manager approval at `50,000` succeeds
 - Manager approval at `50,001` fails
+- Director approval below `50,000` succeeds
+- Director approval at `50,001` succeeds
 - Director approval at `500,000` succeeds
-- Director approval above `500,000` without a valid second approver is rejected
+- A single Director approval above `500,000` is rejected
 - Wrong-role approval is rejected
 - State-preservation assertions for invalid approval attempts
+- Playwright E2E: sign in through the UI as `demo.manager`, create and submit an invoice between `50,000` and `500,000` inclusive (greater than `50,000`), attempt approval through the UI, assert a clear rejection message and `PendingApproval` status, then use an authenticated read-only invoice fetch to verify `DecidedBy` and `DecidedAt` remain unset
 
 **Dependencies**
 - This is the first milestone and establishes the threshold baseline required by the later multi-approver rules.
+- The US1 Playwright task runs after the US1 domain/API/configuration behavior is available; it uses `e2e/tests/`, `e2e/pages/`, and the existing `e2e/playwright.config.ts` web server, which starts the API at `http://localhost:5000`.
+- The existing demo user `demo.manager` is configured in `backend/src/InvoiceApp.Api/appsettings.json`. The existing npm/Playwright dependencies and browser project are used; install E2E dependencies/browser only if missing. No additional application data, database, test server, or infrastructure setup is required because the test creates its own invoice using the UI.
 
 **Validation**
 - `dotnet test backend/InvoiceApp.sln`
@@ -304,7 +310,9 @@ Required checks:
 
 ### Playwright E2E validation
 
-The required browser test must be implemented in the final integration phase and must cover a rejected over-limit approval through the UI using the repository’s role-based locators.
+The US1 browser test is implemented during Milestone 1; the complete Playwright suite is run again during final validation using the repository’s role-based locators.
+
+US1 includes its own independent Playwright test for a Manager approval attempt above `50,000` and at or below `500,000`. It signs in through the UI, creates and submits a unique invoice through the UI, attempts approval using the visible approval control, and asserts the displayed rejection reason plus the still-pending UI state. A read-only authenticated GET may be used only to verify that final decision metadata remains unset; the approval action itself must not bypass the UI.
 
 Location:
 - `e2e/tests/`
