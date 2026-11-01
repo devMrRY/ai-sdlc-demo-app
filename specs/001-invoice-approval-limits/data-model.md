@@ -19,11 +19,25 @@ Fields:
 - `DecidedBy` (`string?`): current approver/decision actor
 - `DecidedAt` (`DateTime?`): timestamp when decision was finally recorded
 - `DecisionNote` (`string?`): reason for rejection or related decision note
+- `ApprovalHistory` (`List<ApprovalRecord>`): authenticated approver records, in approval order
 
 State transitions:
 - `Draft` -> `PendingApproval` via submit flow
-- `PendingApproval` -> `Approved` or `Rejected` via decision flow
+- `PendingApproval` -> `PendingApproval` when the first provisional approval is recorded for an invoice above `500,000`
+- `PendingApproval` -> `Approved` after the valid second approval, or after a valid independent approval at or below `500,000`
+- `PendingApproval` -> `Rejected` via the separate rejection flow
 - Invalid transitions are rejected by domain rule checks
+
+### ApprovalRecord
+
+Each approval record contains:
+- `Approver` (`string`): username from the authenticated session
+- `Role` (`string`): role from the authenticated session
+- `ApprovedAt` (`DateTime`): time the approval was recorded
+
+For invoices above `500,000`, the first record is provisional: the invoice remains `PendingApproval`, and `DecidedBy`/`DecidedAt` remain unset. The first approver may be a Manager or Director; the Manager's `50,000` limit applies to independent single approvals, not this provisional step. A distinct Director must add the second record. Only then does the invoice become `Approved`, with final-decision metadata set to that second Director.
+
+For invoices at or below `500,000`, a valid independent approval adds one approval record and finalizes the invoice under the existing role limits.
 
 ### InvoiceStatus
 
@@ -84,18 +98,11 @@ The assignment requires that runtime demo users include:
 - `DecisionNote` is retained only for valid rejection outcomes
 - `DecidedBy`, `DecidedAt`, and status remain unchanged when validation fails
 
-## Proposed model evolution
-
-The existing model is sufficient for the current scope, but the implementation may require one or more of the following if the design calls for a more explicit multi-step approval record:
-
-- A minimal approval-sequence record for the first and second approver identity while preserving the invoice state object
-- A derived validation method rather than persisted extra fields if the existing model remains sufficient
-
-Any added fields must remain minimal and must not introduce unrelated architecture changes.
-
 ## Data integrity expectations
 
 - Invalid approval attempts must not mutate invoice state.
+- Invalid second approvals must preserve the complete existing `ApprovalHistory` and must not consume the second-approval opportunity.
+- Approval history checks and writes for an invoice must be serialized so concurrent requests cannot record multiple provisional first approvals.
 - Server-side validation must derive the approver identity from authenticated session data.
 - The domain service must perform validations before writing updates to the repository.
 - The API contract must not trust client-provided usernames for approver identity.

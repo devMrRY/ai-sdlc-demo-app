@@ -1,155 +1,102 @@
 # Project Context
 
-This file captures only verified repository facts at the current checkpoint.
+This file is a snapshot of repository facts verified on 2026-11-01.
 
-Manual refresh requirement: this document is updated only when the user explicitly asks for a context refresh or explicitly invokes the `refresh-project-context` skill. It is not refreshed automatically during normal work or incidental edits.
+## Repository state
 
-## Verified repository state
+- Repository: `devMrRY/ai-sdlc-demo-app`
+- Branch: `feature/us2-multi-approval-flow`
+- HEAD: `21d6b8c44e859ecffb34152ccaef986e3d1b2338`
+- Recent commits include `21d6b8c` (`fix: reviewed the PR and fixed findings, created docs`) and `d8de64f` (`US1: enforce Manager and Director approval limits`).
+- The US2 implementation is present as uncommitted worktree changes; no US2 commit is claimed.
+- The worktree also contains modified `.github/logs/ai-interactions.jsonl` and the untracked `.github/logs/sessions/b30ed110-1dbc-49a1-a969-c64a9e8daad1/`. Preserve these unrelated log changes.
+- T042, the US2 commit milestone, remains unchecked.
 
-- Repository branch: `main`
-- Current HEAD: `66cb3f9005af1feafb7890f06bbc41fd652b432a`
-- Working tree state from `git status --short --branch`:
-  - untracked: `.github/hooks/`
-  - untracked: `.github/logs/`
-  - untracked: `.github/skills/`
-  - untracked: `AI_INTERACTION_LOG.md`
-  - untracked: `ASSIGNMENT.md`
-  - untracked: `HANDOFF.md`
-  - untracked: `PROJECT_CONTEXT.md`
+## Application and repository structure
 
-## Application overview
+This is an ASP.NET Core 8 Web API with a static web UI and an in-memory invoice repository.
 
-This is a .NET 8 invoice approval demo app with a simple API and static web UI.
+- `backend/src/InvoiceApp.Domain/`
+  - `Invoice.cs`: invoice state, decision fields, and approval history.
+  - `ApprovalRecord.cs`: persisted approver identity, role, and timestamp.
+  - `InvoiceStatus.cs`: `Draft`, `PendingApproval`, `Approved`, and `Rejected`.
+  - `ApprovalService.cs`: invoice submission, approval, rejection, sequencing, and business validation.
+  - `IInvoiceRepository.cs`: domain repository interface, including atomic invoice operations.
+- `backend/src/InvoiceApp.Api/`
+  - `Program.cs`: dependency registration, middleware, and controller mapping.
+  - `Controllers/`: invoice, approval, and authentication endpoints; `ApiControllerBase` maps domain errors to HTTP responses.
+  - `Auth/`: demo-user configuration, `SessionStore`, bearer-session middleware, and `RequireRoleAttribute`.
+  - `InMemoryInvoiceRepository.cs`: in-memory repository implementation with atomic per-invoice operations.
+  - `wwwroot/`: static UI (`index.html`, `app.js`, and `styles.css`).
+- `backend/tests/InvoiceApp.Tests/`
+  - `ApprovalServiceTests.cs`: domain behavior tests.
+  - `ApprovalsControllerAuthorizationTests.cs`: API authorization tests using ASP.NET Core TestServer.
+  - `FakeInvoiceRepository.cs`: test repository.
+- `e2e/pages/` and `e2e/tests/`: Playwright page object and browser tests.
+- `specs/001-invoice-approval-limits/`: feature specification, plan, tasks, and supporting design/API artifacts.
+- `.github/`: agent instructions, skills, hooks, PR review artifacts, and interaction logs.
+- `docs/use-cases/`: feature use-case briefs.
 
-### Backend structure
+## Verified implementation status
 
-- `backend/src/InvoiceApp.Domain`
-  - domain model and business rules
-  - `ApprovalService` owns the invoice lifecycle
-  - `Invoice` holds `Id`, `CustomerName`, `Amount`, `Status`, `CreatedAt`, `DecidedBy`, `DecidedAt`, `DecisionNote`
-- `backend/src/InvoiceApp.Api`
-  - controllers and authentication middleware
-  - in-memory repository implementation
-  - static web client under `wwwroot/`
-- `backend/tests/InvoiceApp.Tests`
-  - xUnit tests for the domain logic
+### US1 — implemented
 
-### Domain flow
+The committed US1 implementation adds Manager and Director demo users in `backend/src/InvoiceApp.Api/appsettings.json`. The current configured roles are `Approver`, `Admin`, `Manager`, and `Director`.
 
-The current verified invoice lifecycle is:
+`ApprovalService.Approve(invoiceId, approver, role)` validates the role and amount before mutation:
 
-- `Draft`
-- `PendingApproval`
-- `Approved`
-- `Rejected`
+- Manager may approve an invoice up to and including 50,000.
+- Director may approve an invoice up to and including 500,000, including amounts at or below 50,000.
+- An independent single approval above 500,000 is not allowed; the US2 provisional-first-approval flow is described separately below.
+- Invalid approval attempts throw before changing invoice state.
 
-The `ApprovalService` currently implements:
+The approval endpoint is restricted to Manager/Director and obtains the identity and role from the authenticated session. The separate rejection endpoint is restricted to Approver/Admin. `ApiControllerBase.Handle(...)` maps missing invoices to 404, invalid state/business-rule errors to 409, and argument errors to 400.
 
-- `Submit(string invoiceId)`
-  - moves an invoice from `Draft` to `PendingApproval`
-  - rejects non-draft invoices
-- `Approve(string invoiceId, string approver)`
-  - requires the invoice to be in `PendingApproval`
-  - sets `Status = Approved`, `DecidedBy`, and `DecidedAt`
-- `Reject(string invoiceId, string approver, string reason)`
-  - requires a non-empty rejection reason
-  - requires the invoice to be in `PendingApproval`
-  - sets `Status = Rejected`, `DecidedBy`, `DecidedAt`, and `DecisionNote`
+The US1 tests include amount/role boundaries, state preservation for invalid attempts, API authorization through TestServer, and the required Manager over-limit Playwright scenario. The UI test confirms the invoice remains pending and final decision metadata is unset after rejection.
 
-## Verified commands
+The review report `.github/PRs/us1-review-report.md` records F-01 as dismissed and F-02 as fixed; its overall merge decision remains a human decision.
 
-Run the app:
+### US2 — implemented through T041; commit milestone pending
 
-```bash
+For invoices above 500,000, either a Manager or Director may provide the first provisional approval. The service records the authenticated user's identity, role, and timestamp in `Invoice.ApprovalHistory`, while leaving the invoice `PendingApproval` and keeping `DecidedBy` and `DecidedAt` unset. A different authenticated Director must provide the second approval; only then is the invoice marked `Approved` and final decision metadata set.
+
+The approval endpoint continues to derive identity and role from the session. The domain service owns approval sequencing and validation. Repository operations serialize each invoice's state transition. The client does not supply an approval stage or trusted identity. Invalid second approvals preserve invoice state and history; rejection remains a separate operation.
+
+Backend tests cover Manager→Director and Director→Director success, invalid second-role and duplicate-user attempts, recovery with a different Director, finalized invoices, history integrity, and concurrent first approvals. The Playwright test `e2e/tests/high-value-two-approver-approval.spec.ts` verifies the Manager→Director flow in the UI and checks provisional and final persisted state.
+
+`specs/001-invoice-approval-limits/tasks.md` marks T028–T041 complete. T042 is the separate commit milestone and remains unchecked. The US2 implementation is uncommitted. US3 tasks T043–T053 remain outstanding.
+
+## Verified validation
+
+Validation was run on the current checkout on 2026-11-01:
+
+- Targeted API authorization tests: `dotnet test backend/InvoiceApp.sln --filter FullyQualifiedName~ApprovalsControllerAuthorizationTests` — passed, 14 passed, 0 failed, 0 skipped.
+- Full backend suite: `dotnet test backend/InvoiceApp.sln` — passed, 37 passed, 0 failed, 0 skipped.
+- Playwright: `npm test` from `e2e/` — 2 passed, as recorded during the US2 review. This E2E run preceded the current API-test assertion-only edit; application/UI code was not changed by that edit.
+- `git diff --check` passed during the US2 review. Mutation testing was not run or verified.
+
+Commands:
+
+```powershell
 dotnet run --project backend/src/InvoiceApp.Api
-```
-
-Run backend tests:
-
-```bash
 dotnet test backend/InvoiceApp.sln
+Set-Location e2e; npm test
 ```
 
-## Verified test result
+The E2E package also documents dependency/browser setup in `e2e/package.json` and `e2e/playwright.config.ts`.
 
-The current backend test run completed successfully:
+## Logging and agent support
 
-- Passed: 7
-- Failed: 0
-- Skipped: 0
+- `.github/hooks/logger.json` registers lifecycle, prompt, tool, and subagent hook events.
+- `.github/hooks/log-interaction.mjs` writes interaction records to `.github/logs/ai-interactions.jsonl` and per-session files under `.github/logs/sessions/`.
+- `.github/skills/ai-interaction-logger/SKILL.md` documents the logging requirements.
+- `.github/skills/refresh-project-context/SKILL.md` defines this explicit refresh workflow.
+- Project instructions are in `AGENTS.md`; assignment requirements are in `ASSIGNMENT.md`.
 
-This was verified with:
+## Known limitations and pending work
 
-```bash
-dotnet test backend/InvoiceApp.sln --nologo
-```
-
-## Verified logging setup
-
-The repository currently contains Copilot hook logging support under `.github`.
-
-- `.github/hooks/logger.json` registers hook commands for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Stop`, and `SessionEnd`
-- `.github/hooks/log-interaction.mjs` reads stdin JSON payloads, groups events by `sessionId`, and appends summary records to `.github/logs/ai-interactions.jsonl`
-- `.github/logs/sessions/` is used as temporary per-session storage until the session is finalized
-- `.github/skills/ai-interaction-logger/SKILL.md` describes the logging intent and expected audit-shape
-
-The current logger implementation in `log-interaction.mjs` is a prompt + tool summary logger. It records:
-
-- `timestamp`
-- `sessionId`
-- `prompt`
-- `tool`
-- `actionTook`
-- `error`
-- `toolResult`
-
-It does not currently extract a final assistant summary from transcript data. The script intentionally strips large `code` payloads from logged tool arguments to keep the audit log compact.
-
-## Verified documentation files
-
-- `AGENTS.md` — repository conventions for agents and app expectations
-- `README.md` — app overview, run instructions, roles, and basic project layout
-- `ASSIGNMENT.md` — assignment requirements and workflow expectations
-- `AI_INTERACTION_LOG.md` — current AI usage/logging record
-
-## Unverified or not yet completed at this checkpoint
-
-These are not confirmed as complete based on the current repo state:
-
-- feature implementation for approval limits beyond the current core approval workflow
-- mutation testing results
-- Playwright end-to-end test execution
-- final pull request creation and review
-- the presence of a finished `PROJECT_CONTEXT.md`/`HANDOFF.md` before this file
-- completion of the full assignment workflow beyond the verified baseline app and tests
-
-## Notes for the next agent
-
-Before making product changes, verify the intended requirement against `ASSIGNMENT.md` and the current app behavior. The repo is currently in a verified baseline state: the app builds and the existing backend tests pass, but the broader assignment work is not yet claimed complete.
-
-## Auth and role flow
-
-The current app authenticates users by username and password against the configured demo users in `backend/src/InvoiceApp.Api/appsettings.json`.
-
-- `AuthController.Login` accepts a `{ username, password }` payload and checks it against the configured users list.
-- If the credentials match, it creates a bearer token via `SessionStore` and returns it to the client.
-- `SessionAuthMiddleware` enforces auth for all `/api` routes except `/api/auth/login` by validating the bearer token.
-- `RequireRoleAttribute` enforces role-based authorization on controller actions by checking the session role against the allow-list defined on the controller action.
-- The current configured demo roles are:
-  - `Approver`
-  - `Admin`
-- `Manager` and `Director` are required by the assignment, but they are not yet present in the current runtime configuration and must be added before a cold agent can sign in as them.
-
-## Configured demo users
-
-The current runtime users in `appsettings.json` are:
-
-- `demo.approver` / `ChangeMe123!` (role `Approver`)
-- `demo.admin` / `ChangeMe123!` (role `Admin`)
-
-The assignment requires additional demo users:
-
-- `demo.manager` / `ChangeMe123!` (role `Manager`)
-- `demo.director` / `ChangeMe123!` (role `Director`)
-
-These must be added to the runtime configuration before they can be used for approval testing or sign-in.
+- US3 rejection-integrity work remains outstanding; do not infer completion from US2 coverage.
+- T042 remains pending human approval and has not been executed.
+- The TestServer authorization fixture composes its own host and middleware pipeline rather than exercising production startup wiring. The review accepted this narrower startup-wiring coverage; the tests do exercise the real session store, middleware, role filter, controller, and error mapping.
+- Mutation testing and remaining assignment deliverables are not verified complete.
+- Preserve the current uncommitted interaction/session log paths; do not overwrite or discard them.
