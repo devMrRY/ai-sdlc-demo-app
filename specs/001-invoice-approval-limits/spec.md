@@ -43,6 +43,7 @@ Any invoice above 500,000 must have a valid two-step approval flow where the fir
 2. **Given** an invoice amount above 500,000 and a valid first approver, **When** the second approver is not a Director, **Then** the system rejects the request and preserves the original invoice state.
 3. **Given** an invoice amount above 500,000 and a valid first approver, **When** the approval order is invalid or the invoice is already finalized, **Then** the system rejects the request, returns a clear reason, and leaves the invoice unchanged.
 4. **Given** an invoice amount above 500,000 and two valid approvers, **When** the request is processed successfully, **Then** the invoice is approved only after both approvers are distinct and the second approver is a Director.
+5. **Given** an invoice with `Rejected` status, **When** a user attempts to approve it, **Then** the system rejects the attempt and leaves the invoice unchanged.
 
 ---
 
@@ -59,6 +60,7 @@ When an approval or rejection request is invalid, the system must return a clear
 1. **Given** an invoice awaiting decision and a user submits a rejection, **When** the rejection reason is blank, **Then** the system rejects the rejection and preserves the invoice state.
 2. **Given** a valid invoice and an invalid approval attempt, **When** the approval is rejected, **Then** the invoice remains exactly in its previous state and no partial decision data is written.
 3. **Given** a valid invoice before an attempted decision, **When** the user attempts approval or rejection with an invalid role, invalid order, duplicate approver, or already-finalized invoice, **Then** the system rejects the request and leaves the invoice unchanged.
+4. **Given** an invoice with `Approved` status, **When** a user attempts to reject it, **Then** the system rejects the attempt and leaves the invoice unchanged.
 
 ---
 
@@ -72,6 +74,8 @@ When an approval or rejection request is invalid, the system must return a clear
 - What happens when the same user is listed twice in a two-approver approval sequence?
 - What happens when the second approver is not a Director?
 - What happens when approval is attempted on an already-approved or rejected invoice?
+- What happens when approval is attempted on an already-Rejected invoice?
+- What happens when rejection is attempted on an already-Approved invoice?
 - What happens when the rejection request includes no explanation message?
 - What happens when a failed approval occurs after the first approver is validated but before the invoice is persisted?
 ## Requirements *(mandatory)*
@@ -87,12 +91,14 @@ When an approval or rejection request is invalid, the system must return a clear
 - **FR-007**: The system MUST reject any approval sequence where the same user appears as both approvers.
 - **FR-008**: The system MUST reject invalid approval order, unsupported roles, and unauthorized attempts with a clear reason.
 - **FR-009**: The system MUST leave the invoice unchanged when any approval attempt is rejected, with no partial approval or state mutation.
-- **FR-010**: The system MUST reject attempts to approve already-finalized invoices.
+- **FR-010**: The system MUST reject attempts to approve already-finalized invoices, including invoices with `Rejected` status.
 - **FR-011**: The system MUST verify the runtime demo-user configuration and include the required Manager and Director users before testing or sign-in.
 - **FR-012**: The approval rules MUST be implemented in the Domain layer, not in controllers, startup code, or the UI.
 - **FR-013**: The project MUST have automated tests covering threshold values, just-above thresholds, duplicate approvers, wrong role attempts, invalid order, already-finalized invoices, and invoice state integrity after rejected approvals.
 - **FR-014**: The project MUST include a Playwright E2E test using the actual user interface and Manager demo-user sign-in to verify that an approval attempt for an invoice amount greater than 50,000 and no greater than 500,000 is rejected with a clear message, leaves the invoice `PendingApproval`, and records no final decision.
 - **FR-015**: The project MUST use the repository conventions for role-based checks, domain validation, and test structure defined by the current project guidance.
+- **FR-016**: The system MUST reject attempts to reject invoices with `Approved` status and leave the invoice unchanged.
+- **FR-017**: Only users with the `Manager` or `Director` role may approve or reject invoices. The system MUST return HTTP 403 with `A Manager or Director role is required to perform this operation.` for `Approver`, `Admin`, and unsupported roles, without changing invoice state.
 
 ### Key Entities
 
@@ -111,11 +117,13 @@ When an approval or rejection request is invalid, the system must return a clear
 - **SC-004**: Automated test coverage includes valid and invalid approval path validation, including duplicate approvers and invalid order.
 - **SC-005**: A Playwright test signs in as a Manager through the UI, attempts to approve an invoice greater than 50,000 and no greater than 500,000, observes a clear rejection message, and verifies that the invoice remains `PendingApproval` with no final decision recorded.
 - **SC-006**: The project is ready for implementation planning and later execution of validation commands, mutation testing, and review evidence collection.
+- **SC-007**: Automated tests verify that approval of a `Rejected` invoice and rejection of an `Approved` invoice are rejected without changing invoice state.
+- **SC-008**: API tests verify that only Manager and Director roles can approve or reject invoices, and that forbidden requests preserve invoice state.
 
 ## Assumptions
 
 - The existing application uses a role-based authorization model and will continue to do so for this feature.
-- The assignment-defined Manager and Director credentials are required for the feature even if the repo baseline currently contains only Approver and Admin roles.
+- The configured Approver and Admin users remain available for sign-in and negative authorization tests; only Manager and Director may approve or reject invoices.
 - The business logic must rely on the existing invoice lifecycle and state model rather than introducing a new invoice approval workflow.
 - Invoice amounts follow the app’s current monetary conventions and decimal handling.
 - UI changes are optional only to the extent required to expose the workflow under the existing app design.
@@ -156,5 +164,5 @@ When an approval or rejection request is invalid, the system must return a clear
 ## Open Questions / Unresolved Points
 
 - The assignment defines the approval semantics clearly, but the specific UI transaction flow for multi-approver submission must still be validated during implementation against the current web client and controller contracts.
-- The current repo baseline includes `Approver` and `Admin` roles; the actual runtime configuration for `Manager` and `Director` must be confirmed before testing sign-in and authorization.
+- The runtime configuration contains demo users for Approver, Admin, Manager, and Director; all four roles can sign in, but only Manager and Director may approve or reject invoices.
 - The exact user-facing error text for invalid approval attempts is not mandated in the assignment beyond requiring a clear reason; wording can be finalized during implementation based on project conventions.

@@ -12,7 +12,7 @@ This feature is an extension of the existing ASP.NET Core 8 invoice approval dem
 - API layer: `backend/src/InvoiceApp.Api`
 - Test project: `backend/tests/InvoiceApp.Tests`
 - E2E project: `e2e/`
-- Current baseline roles: `Approver`, `Admin`
+- Initial baseline roles before the approval-limit work: `Approver`, `Admin`; the configured roles now include `Manager` and `Director`, and only Manager/Director may approve or reject invoices.
 - Current baseline invoice statuses: `Draft`, `PendingApproval`, `Approved`, `Rejected`
 - Current approval API contract: single approver only, derived from authenticated session
 

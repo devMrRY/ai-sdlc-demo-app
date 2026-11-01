@@ -14,14 +14,16 @@ Open http://localhost:5000 and sign in:
 | --- | --- | --- |
 | `demo.approver` | `ChangeMe123!` | Approver |
 | `demo.admin` | `ChangeMe123!` | Admin |
+| `demo.manager` | `ChangeMe123!` | Manager |
+| `demo.director` | `ChangeMe123!` | Director |
 
-These are demo accounts for a local, in-memory app. They are not real credentials.
+These are demo accounts for a local, in-memory app. They are not real credentials. All four accounts can sign in, but only Manager and Director roles can approve or reject invoices. Approver and Admin are retained for unauthorized-access testing.
 
 ## What it does
 
 1. Create an invoice (it starts as a draft).
 2. Submit it for approval.
-3. An approver approves it, or rejects it with a reason.
+3. A Manager or Director approves or rejects it with a reason for rejection.
 
 Invoices move through Draft, Pending Approval, then Approved or Rejected.
 

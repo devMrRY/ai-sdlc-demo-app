@@ -6,7 +6,7 @@
 
 ## Summary
 
-This feature extends the existing .NET 8 invoice approval demo with role-based approval limits and a two-approver rule for high-value invoices. The app currently supports single-approver approval and only `Approver`/`Admin` roles. The approved specification requires adding `Manager` and `Director`, enforcing threshold logic, preserving invoice state on rejected approvals, and honoring the repository’s layered architecture.
+This feature extends the existing .NET 8 invoice approval demo with role-based approval limits and a two-approver rule for high-value invoices. The runtime has demo users with `Approver`, `Admin`, `Manager`, and `Director` roles. Only Manager and Director may approve or reject invoices; Approver and Admin remain configured for sign-in and negative authorization tests. The approved specification requires enforcing threshold logic, preserving invoice state on rejected attempts, and honoring the repository’s layered architecture.
 
 The implementation will be staged into three independent milestones, each mapped to one approved user story and committed separately. Business rules will remain in `backend/src/InvoiceApp.Domain`, the controllers will remain thin HTTP adapters, and the static UI will remain minimal.
 
@@ -133,7 +133,7 @@ ai-sdlc-demo-app/
 
 - The app is a .NET 8 ASP.NET Core API with a static web UI and in-memory data store.
 - The current app uses session-based authentication and controller-level `RequireRole` checks.
-- The current role model contains `Approver` and `Admin`; `Manager` and `Director` are not yet present in runtime configuration.
+- At the initial planning baseline, the role model contained `Approver` and `Admin`; runtime configuration now includes all four demo roles, with invoice approval and rejection restricted to Manager and Director.
 - The current approval flow is single approver only.
 - The repo has no current multi-approver API contract.
 - `DecisionNote` is persisted for valid rejection reasons and returned in the invoice response payload.
@@ -217,6 +217,7 @@ These support the approved specification rather than replacing it.
 - Require the second approver to be a `Director`.
 - Reject duplicate approvers and invalid approval order.
 - Reject attempts on already-finalized invoices.
+- Reject approval attempts on invoices with `Rejected` status and preserve the invoice state.
 - Preserve invoice state on all invalid sequences.
 
 **Files to modify**
@@ -240,6 +241,7 @@ These support the approved specification rather than replacing it.
 - Invalid approval order is rejected
 - A valid two-step approval succeeds for amounts above `500,000`
 - Attempting approval on an already-finalized invoice fails without mutation
+- Attempting approval on an already-Rejected invoice fails without mutation
 
 **Dependencies**
 - Depends on Milestone 1 passing and remaining in place.
@@ -255,6 +257,7 @@ These support the approved specification rather than replacing it.
 
 **Implementation scope**
 - Require a rejection reason for invalid reject attempts.
+- Restrict both approval and rejection endpoints to Manager and Director, returning the specified 403 response for other roles without mutating invoice state.
 - Ensure invalid approvals or rejections never partially update invoice state.
 - Preserve `Status`, `DecidedBy`, `DecidedAt`, and `DecisionNote` on rejected attempts.
 
@@ -274,6 +277,7 @@ These support the approved specification rather than replacing it.
 
 **Required tests**
 - Blank rejection reason is rejected
+- Attempting to reject an already-Approved invoice fails without mutation
 - Invalid approval on a finalized invoice does not mutate state
 - Duplicate approver invalid path leaves invoice unchanged
 - Wrong-role invalid path leaves invoice unchanged
@@ -306,6 +310,8 @@ Required checks:
 - Same-user rejection enforced
 - Invalid order rejected
 - Already-finalized invoice rejected
+- Already-Rejected invoice approval rejected without mutation
+- Already-Approved invoice rejection rejected without mutation
 - Rejection reason required and persisted only on valid rejection
 
 ### Playwright E2E validation
