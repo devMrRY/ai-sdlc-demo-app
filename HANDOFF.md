@@ -4,43 +4,37 @@ Checkpoint date: 2026-11-01
 
 ## Checkpoint summary
 
-US2 implementation and review follow-up are complete through T041. The API authorization tests now compare full invoice snapshots, and project context has been refreshed from verified repository state. No commit was created; T042 remains pending, and US3 is outstanding.
+US1 and US2 implementation work is complete. US3 rejection integrity and the Manager/Director-only approval/rejection authorization update are implemented, reviewed, and validated. No US3 commit has been created; T053 remains pending.
 
 ## Repository state
 
-- Branch: `feature/us2-multi-approval-flow`
-- HEAD: `21d6b8c44e859ecffb34152ccaef986e3d1b2338`
-- US2 code, test, design-document, and task changes remain uncommitted; no US2 commit is claimed.
-- T028–T041 are checked in `specs/001-invoice-approval-limits/tasks.md`; T042 remains unchecked.
-- `.github/logs/ai-interactions.jsonl` is modified and `.github/logs/sessions/b30ed110-1dbc-49a1-a969-c64a9e8daad1/` is untracked. Preserve both.
-- The US2 review accepted the manually composed TestServer host as a limitation: it tests the real session store, middleware, role authorization attribute, controller, and error mapping, but not production startup wiring.
+- Branch: `feature/us3-invoice-rejection-workflow`
+- HEAD: `ebc31fa70da07e59cdc4dbdef44a6b2d28ec09b2` (`fix: added docs for us2 and updated context`)
+- Working tree is dirty. US3 implementation/tests and related docs/spec changes are uncommitted; preserve all unrelated edits and interaction/session logs.
+- US1 and US2 implementations are complete; US2 commit `e1bb728` is in history.
+- US3 tasks T043–T052 are complete. T053 remains unchecked because the separate US3 commit has not succeeded.
+- Do not claim US3 is committed, pushed, or merged.
 
-## Implementation verified
+## Verified role model and behavior
 
-- **US1:** Manager can independently approve through 50,000; Director can independently approve through 500,000, including lower amounts. Invalid independent approvals fail without mutation.
-- **US2:** For amounts above 500,000, the first approval may be by a Manager or Director. It is recorded in `ApprovalHistory` with authenticated username, role, and timestamp; invoice status remains `PendingApproval`, and final-decision metadata remains unset.
-- A different Director must provide the second approval. The second record finalizes the invoice and supplies `DecidedBy`/`DecidedAt`.
-- Invalid second-role and same-user attempts preserve the full pending state and approval history. A later valid Director can complete approval.
-- Approval policy is implemented in the Domain service; the API takes identity and role from the authenticated session. Invoice operations are serialized by the in-memory repository.
-- Playwright covers the UI Manager→Director flow and verifies provisional and final invoice state.
-- **US3:** Remains outstanding. Do not mark US3 tasks complete.
+- Demo users for `Approver`, `Admin`, `Manager`, and `Director` remain in `backend/src/InvoiceApp.Api/appsettings.json`; all can sign in.
+- Only Manager and Director may approve or reject invoices.
+- Approver, Admin, and unsupported roles receive HTTP 403 with `A Manager or Director role is required to perform this operation.` on both decision endpoints. The API tests assert forbidden requests preserve the invoice snapshot.
+- The UI displays no decision controls to roles other than Manager and Director.
+- US1 approval thresholds remain: Manager up to and including 50,000; Director up to and including 500,000.
+- For amounts above 500,000, the first approval may be by a Manager or Director and remains provisional; a distinct Director must make the second approval to finalize.
+- A Rejected invoice cannot be approved; an Approved invoice cannot be rejected. Invalid decision attempts preserve invoice state.
+- Rejection requires a non-empty reason and records the authenticated actor, decision timestamp, and reason.
 
-## Validation performed
+## Review and validation
 
-After strengthening API state-preservation assertions:
-
-- `dotnet test backend/InvoiceApp.sln --filter FullyQualifiedName~ApprovalsControllerAuthorizationTests` — passed: 14 passed, 0 failed, 0 skipped.
-- `dotnet test backend/InvoiceApp.sln` — passed: 37 passed, 0 failed, 0 skipped.
-- Playwright `npm test` from `e2e/` — 2 passed, as recorded during the US2 review. This run preceded the current API-test assertion-only change; production and E2E code were not changed by that edit.
-- `git diff --check` passed during the US2 review; it should be rerun after final edits if needed.
-- Mutation testing was not run.
-
-## Review follow-up
-
-- **F-01 accepted:** `PROJECT_CONTEXT.md` and this handoff were refreshed with current US1/US2/US3 status, Git state, and verified test evidence.
-- **F-02 accepted:** `ApprovalsControllerAuthorizationTests.AssertInvoiceUnchanged` now compares every `Invoice` property and `ApprovalHistory` against a snapshot. Forbidden and unauthenticated tests use the stronger initial-state assertion; the invalid second-approval API path compares against a full provisional-state snapshot.
-- **F-03 accepted limitation:** No production-startup/TestServer refactor was made, as requested. The test fixture retains its current host composition.
+- US3 review-analysis completed with **no confirmed code defects**. The report noted stale status documentation and missing test evidence at review time; the tests below were subsequently executed successfully.
+- `dotnet test backend\InvoiceApp.sln -c Release --filter "FullyQualifiedName~ApprovalsControllerAuthorizationTests"` — **17 passed, 0 failed, 0 skipped**.
+- `dotnet test backend\InvoiceApp.sln -c Release` — **44 passed, 0 failed, 0 skipped**.
+- From `e2e`: `npm test` — **4 passed**.
+- `git diff --check` — **passed**.
+- Mutation testing was not run; T054–T058 remain unchecked.
 
 ## Next step
 
-Review the updated API test and context documents. Keep T042 unchecked until explicit approval to commit. US3 requires its own approved implementation and validation work.
+Wait for human review and explicit authorization before creating the separate US3 commit. Do not mark T053 complete unless that commit succeeds. Preserve all unrelated working-tree changes and logs.

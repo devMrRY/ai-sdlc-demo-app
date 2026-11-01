@@ -14,7 +14,7 @@ Invoice approval demo app: ASP.NET Core 8 Web API with a small static web UI.
 
 - Controllers live in `Controllers/`, one per resource, route `api/[controller]`. Request bodies are `record` types declared inside the controller.
 - Controllers inherit `ApiControllerBase` and use `Handle(...)` so service errors map to 404, 409 and 400.
-- Every endpoint is behind sign-in. Restrict actions with `[RequireRole("...")]`: destructive actions are Admin only; approvals are subject to the assignment-specific role rules below.
+- Every endpoint is behind sign-in. Restrict actions with `[RequireRole("...")]`: destructive actions are Admin only; invoice approval and rejection actions are restricted to Manager and Director.
 - Business rules go in the Domain project, never in controllers.
 - Register services in `Program.cs`. Repositories are interfaces in Domain with an in-memory implementation in Api.
 - Every new rule or endpoint needs tests. Use `FakeInvoiceRepository` in tests.
@@ -42,9 +42,10 @@ Invoice approval demo app: ASP.NET Core 8 Web API with a small static web UI.
 
 ### Role model note
 
-- Current runtime roles in the repo are `Approver` and `Admin`.
-- The assignment requires `Manager` and `Director` approval roles to be added and used consistently in configuration, authorization checks, and tests.
-- Do not assume these roles are already present in the runtime; they must be created in the configured demo users before a cold agent can sign in as them.
+- Runtime demo users include `Approver`, `Admin`, `Manager`, and `Director`.
+- Keep the Approver and Admin users and their seeded roles available for sign-in and negative authorization testing.
+- Only Manager and Director may approve or reject invoices. Approver, Admin, and any unsupported role must receive HTTP 403 with `A Manager or Director role is required to perform this operation.` for either decision endpoint.
+- Manager and Director demo users must remain configured for sign-in and authorized decision testing.
 
 ## Commands
 
@@ -53,15 +54,10 @@ Invoice approval demo app: ASP.NET Core 8 Web API with a small static web UI.
 - Run end-to-end tests: `cd e2e && npm install && npx playwright install chromium && npm test`
 - Run mutation testing with the required version: `dotnet tool install -g dotnet-stryker --version 4.13.0`
 
-## Demo accounts already present (not real credentials)
+## Demo accounts (not real credentials)
 
-- `demo.approver` / `ChangeMe123!` (role Approver)
-- `demo.admin` / `ChangeMe123!` (role Admin)
-
-## Required demo accounts for this assignment
-
-These users are required for the approval-limit assignment and must be added to the configured demo users before testing or sign-in:
-
+- `demo.approver` / `ChangeMe123!` (role Approver; sign-in allowed, invoice approval/rejection forbidden)
+- `demo.admin` / `ChangeMe123!` (role Admin; sign-in allowed, invoice approval/rejection forbidden)
 - `demo.manager` / `ChangeMe123!` (role Manager)
 - `demo.director` / `ChangeMe123!` (role Director)
 

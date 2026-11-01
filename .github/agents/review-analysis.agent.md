@@ -1,7 +1,7 @@
 ---
 name: review-analysis
 description: "Use this agent to review assignments, specs, implementation changes, and PR diffs against repo requirements and produce a structured report using the repository review-analysis-output.md template. This agent is read-only and does not edit files or code."
-model: GPT-4.1
+model: gpt-5.6-luna
 ---
 
 # Review & Analysis Agent
