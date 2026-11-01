@@ -16,15 +16,16 @@ A manager or director must be able to approve an invoice only when the invoice a
 
 **Why this priority**: This is the primary business workflow and the baseline rule for approval authority by role and amount.
 
-**Independent Test**: A manager can approve exactly 50,000 and a director can approve exactly 500,000, while amounts above those thresholds are rejected unless they satisfy the valid multi-approver rules.
+**Independent Test**: A manager can approve exactly 50,000, and a director can independently approve any valid invoice amount up to and including 500,000, including amounts below 50,000. Attempts above the applicable single-approval limit are rejected without changing invoice state.
 
 **Acceptance Scenarios**:
 
 1. **Given** an invoice amount of 50,000 and a logged-in user with the Manager role, **When** the user approves the invoice, **Then** the approval succeeds and the invoice is marked approved.
-2. **Given** an invoice amount of 500,000 and a logged-in user with the Director role, **When** the user approves the invoice, **Then** the approval succeeds and the invoice is marked approved.
+2. **Given** an invoice amount of 500,000 or less and a logged-in user with the Director role, **When** the user approves the invoice, **Then** the approval succeeds and the invoice is marked approved.
 3. **Given** an invoice amount above 50,000 and a logged-in user with the Manager role, **When** the user approves the invoice, **Then** the system rejects the request because Manager approvals are valid only up to and including 50,000 and the invoice remains unchanged.
 4. **Given** an invoice amount above 500,000 and a logged-in user with the Director role, **When** the user attempts approval without a valid second approver, **Then** the system rejects the attempt and the invoice remains unchanged.
 5. **Given** a logged-in user without a valid approval role, **When** the user attempts to approve an invoice, **Then** the system rejects the request with a clear authorization message and does not mutate the invoice.
+6. **Given** an invoice amount greater than 50,000 and no greater than 500,000, and a logged-in Manager, **When** the Manager attempts approval through the actual user interface, **Then** the interface displays a clear rejection message, the invoice remains `PendingApproval`, and no final approval decision is recorded; this behavior MUST be verified by a Playwright end-to-end test.
 
 ---
 
@@ -65,6 +66,7 @@ When an approval or rejection request is invalid, the system must return a clear
 
 - What happens when the invoice amount is exactly 50,000 for a Manager approval?
 - What happens when the invoice amount is exactly 500,000 for a Director approval?
+- What happens when a Director approves an invoice amount below 50,000?
 - What happens when the invoice amount is just above 50,000 for a Manager approval?
 - What happens when the invoice amount is just above 500,000 for a Director approval?
 - What happens when the same user is listed twice in a two-approver approval sequence?
@@ -78,7 +80,7 @@ When an approval or rejection request is invalid, the system must return a clear
 
 - **FR-001**: The system MUST allow a Manager to approve an invoice amount up to and including 50,000.
 - **FR-002**: The system MUST reject a Manager approval attempt for an invoice amount above 50,000 with a clear reason.
-- **FR-003**: The system MUST allow a Director to approve an invoice amount up to and including 500,000.
+- **FR-003**: The system MUST allow a Director to approve any valid invoice amount up to and including 500,000, including amounts below 50,000.
 - **FR-004**: The system MUST reject a Director approval attempt for an invoice amount above 500,000 unless the approval is part of a valid two-approver flow.
 - **FR-005**: The system MUST require invoices above 500,000 to have two distinct approvers.
 - **FR-006**: The second approver for invoices above 500,000 MUST be a Director.
@@ -89,7 +91,7 @@ When an approval or rejection request is invalid, the system must return a clear
 - **FR-011**: The system MUST verify the runtime demo-user configuration and include the required Manager and Director users before testing or sign-in.
 - **FR-012**: The approval rules MUST be implemented in the Domain layer, not in controllers, startup code, or the UI.
 - **FR-013**: The project MUST have automated tests covering threshold values, just-above thresholds, duplicate approvers, wrong role attempts, invalid order, already-finalized invoices, and invoice state integrity after rejected approvals.
-- **FR-014**: The project MUST include a Playwright E2E test covering a rejected over-limit approval through the UI.
+- **FR-014**: The project MUST include a Playwright E2E test using the actual user interface and Manager demo-user sign-in to verify that an approval attempt for an invoice amount greater than 50,000 and no greater than 500,000 is rejected with a clear message, leaves the invoice `PendingApproval`, and records no final decision.
 - **FR-015**: The project MUST use the repository conventions for role-based checks, domain validation, and test structure defined by the current project guidance.
 
 ### Key Entities
@@ -103,11 +105,11 @@ When an approval or rejection request is invalid, the system must return a clear
 
 ### Measurable Outcomes
 
-- **SC-001**: All approval-limit boundary scenarios are validated for amounts at 50,000, just above 50,000, 500,000, and just above 500,000.
+- **SC-001**: All approval-limit boundary scenarios are validated for amounts below 50,000 for Directors, at 50,000, just above 50,000, 500,000, and just above 500,000.
 - **SC-002**: Every negative approval scenario produces a clear rejection reason and leaves the invoice state unchanged.
 - **SC-003**: The project demonstrates that the approval authority rules are enforced by role and amount without bypassing the Domain layer.
 - **SC-004**: Automated test coverage includes valid and invalid approval path validation, including duplicate approvers and invalid order.
-- **SC-005**: A user-facing Playwright test verifies the rejected over-limit approval flow from the UI.
+- **SC-005**: A Playwright test signs in as a Manager through the UI, attempts to approve an invoice greater than 50,000 and no greater than 500,000, observes a clear rejection message, and verifies that the invoice remains `PendingApproval` with no final decision recorded.
 - **SC-006**: The project is ready for implementation planning and later execution of validation commands, mutation testing, and review evidence collection.
 
 ## Assumptions
