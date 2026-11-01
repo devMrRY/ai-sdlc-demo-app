@@ -1,95 +1,46 @@
 # Handoff
 
-Checkpoint date: 2026-10-25
-Summary: Verified baseline application and backend tests are in place. The invoice approval assignment requirements remain unverified; the project context and handoff files are intentionally refreshed only when the user explicitly requests it.
+Checkpoint date: 2026-11-01
 
-This checkpoint is maintained manually when the user explicitly invokes the `refresh-project-context` skill or asks for a project sync update. It is not refreshed automatically during normal work.
+## Checkpoint summary
 
-## Verified checkpoint
+US2 implementation and review follow-up are complete through T041. The API authorization tests now compare full invoice snapshots, and project context has been refreshed from verified repository state. No commit was created; T042 remains pending, and US3 is outstanding.
 
-- Branch: `main`
-- HEAD: `66cb3f9005af1feafb7890f06bbc41fd652b432a`
-- Verified with: `git status --short --branch` and `git rev-parse HEAD`
-- Current working tree includes untracked `.github` files, `AI_INTERACTION_LOG.md`, `ASSIGNMENT.md`, `HANDOFF.md`, and `PROJECT_CONTEXT.md`.
+## Repository state
 
-## Relevant uncommitted changes
+- Branch: `feature/us2-multi-approval-flow`
+- HEAD: `21d6b8c44e859ecffb34152ccaef986e3d1b2338`
+- US2 code, test, design-document, and task changes remain uncommitted; no US2 commit is claimed.
+- T028–T041 are checked in `specs/001-invoice-approval-limits/tasks.md`; T042 remains unchecked.
+- `.github/logs/ai-interactions.jsonl` is modified and `.github/logs/sessions/b30ed110-1dbc-49a1-a969-c64a9e8daad1/` is untracked. Preserve both.
+- The US2 review accepted the manually composed TestServer host as a limitation: it tests the real session store, middleware, role authorization attribute, controller, and error mapping, but not production startup wiring.
 
-- `.github/` logging and skill files are present and untracked.
-- `AI_INTERACTION_LOG.md` is present as a human-readable audit artifact.
-- `ASSIGNMENT.md` is present as the assignment specification.
-- `PROJECT_CONTEXT.md` and `HANDOFF.md` are intentionally being maintained as manual checkpoint files.
+## Implementation verified
 
-## Current status
+- **US1:** Manager can independently approve through 50,000; Director can independently approve through 500,000, including lower amounts. Invalid independent approvals fail without mutation.
+- **US2:** For amounts above 500,000, the first approval may be by a Manager or Director. It is recorded in `ApprovalHistory` with authenticated username, role, and timestamp; invoice status remains `PendingApproval`, and final-decision metadata remains unset.
+- A different Director must provide the second approval. The second record finalizes the invoice and supplies `DecidedBy`/`DecidedAt`.
+- Invalid second-role and same-user attempts preserve the full pending state and approval history. A later valid Director can complete approval.
+- Approval policy is implemented in the Domain service; the API takes identity and role from the authenticated session. Invoice operations are serialized by the in-memory repository.
+- Playwright covers the UI Manager→Director flow and verifies provisional and final invoice state.
+- **US3:** Remains outstanding. Do not mark US3 tasks complete.
 
-### Completed and verified
+## Validation performed
 
-- Basic .NET 8 invoice approval app exists and is runnable.
-- Domain approval lifecycle is implemented in `ApprovalService`.
-- Backend unit tests currently pass.
-- Hook-based Copilot interaction logging files are in place under `.github`.
-- A prompt/tool summary logger is implemented in `.github/hooks/log-interaction.mjs`.
-- Aggregate interaction logs are being written to `.github/logs/ai-interactions.jsonl`.
+After strengthening API state-preservation assertions:
 
-### Not yet verified as complete
+- `dotnet test backend/InvoiceApp.sln --filter FullyQualifiedName~ApprovalsControllerAuthorizationTests` — passed: 14 passed, 0 failed, 0 skipped.
+- `dotnet test backend/InvoiceApp.sln` — passed: 37 passed, 0 failed, 0 skipped.
+- Playwright `npm test` from `e2e/` — 2 passed, as recorded during the US2 review. This run preceded the current API-test assertion-only change; production and E2E code were not changed by that edit.
+- `git diff --check` passed during the US2 review; it should be rerun after final edits if needed.
+- Mutation testing was not run.
 
-- Feature implementation for the assignment's invoice approval limits
-- Mutation testing outcomes
-- Playwright end-to-end test execution
-- Review findings and PR creation
-- Final demonstration readiness
-- Full assignment workflow completion per `ASSIGNMENT.md`
+## Review follow-up
 
-## Current evidence
+- **F-01 accepted:** `PROJECT_CONTEXT.md` and this handoff were refreshed with current US1/US2/US3 status, Git state, and verified test evidence.
+- **F-02 accepted:** `ApprovalsControllerAuthorizationTests.AssertInvoiceUnchanged` now compares every `Invoice` property and `ApprovalHistory` against a snapshot. Forbidden and unauthenticated tests use the stronger initial-state assertion; the invalid second-approval API path compares against a full provisional-state snapshot.
+- **F-03 accepted limitation:** No production-startup/TestServer refactor was made, as requested. The test fixture retains its current host composition.
 
-### Backend tests
+## Next step
 
-Command used:
-
-```bash
-dotnet test backend/InvoiceApp.sln --nologo
-```
-
-Result:
-
-- Passed: 7
-- Failed: 0
-- Skipped: 0
-
-### App startup
-
-The project is designed to run with:
-
-```bash
-dotnet run --project backend/src/InvoiceApp.Api
-```
-
-### Logging files
-
-- `.github/hooks/logger.json`
-- `.github/hooks/log-interaction.mjs`
-- `.github/logs/ai-interactions.jsonl`
-- `.github/logs/sessions/`
-- `.github/skills/ai-interaction-logger/SKILL.md`
-
-## Important decisions and review findings
-
-- The context refresh workflow is intentionally manual and must only run after explicit user approval.
-- Verified status remains limited to the baseline app and backend tests; assignment-specific approval-limit work remains unverified.
-- No unverified assignment requirement is marked complete.
-
-## Incomplete requirements and blockers
-
-- Approval-limit business rules, manager/director logic, and distinct-approver checks have not been verified as implemented.
-- Mutation testing results are not yet available.
-- End-to-end Playwright validation has not been run.
-- Review findings and pull request creation have not been completed.
-
-## Recommended next action
-
-The next agent should read `ASSIGNMENT.md`, verify the approval-limit feature requirements, then implement only the missing business rules and tests required by the assignment. Do not assume the broader assignment work is complete until tests, mutation testing, and review artifacts are verified.
-
-## Notes for continuity
-
-- The logger intentionally records a single prompt/tool summary per turn and does not attempt to capture final assistant reasoning text from transcripts.
-- The repository is on a clean branch state aside from the expected untracked `.github` and assignment/documentation files.
-- Use verified facts only; do not mark assignment requirements as complete without test evidence.
+Review the updated API test and context documents. Keep T042 unchecked until explicit approval to commit. US3 requires its own approved implementation and validation work.

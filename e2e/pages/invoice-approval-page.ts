@@ -7,11 +7,11 @@ export class InvoiceApprovalPage {
     await this.page.goto('/');
   }
 
-  async signIn(username: string, password: string) {
+  async signIn(username: string, password: string, role = 'Manager') {
     await this.page.getByLabel('Username').fill(username);
     await this.page.getByLabel('Password').fill(password);
     await this.page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(this.page.getByText(`${username} (Manager)`)).toBeVisible();
+    await expect(this.page.getByText(`${username} (${role})`, { exact: true })).toBeVisible();
   }
 
   async createAndSubmitInvoice(customerName: string, amount: number) {
@@ -31,10 +31,31 @@ export class InvoiceApprovalPage {
   }
 
   async approveAsManager(invoiceId: string) {
+    await this.approve(invoiceId);
+  }
+
+  async approve(invoiceId: string) {
     await this.page.getByRole('tab', { name: 'Approvals' }).click();
     await this.page
       .getByRole('button', { name: `Approve invoice ${invoiceId}` })
       .click();
+  }
+
+  async signOut() {
+    await this.page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(this.page.getByRole('button', { name: 'Sign in' })).toBeVisible();
+  }
+
+  async expectProvisionalApproval(invoiceId: string, approver: string, role: string) {
+    const invoiceItem = this.page
+      .getByRole('listitem')
+      .filter({ hasText: invoiceId });
+    await expect(invoiceItem).toBeVisible();
+    await expect(
+      invoiceItem.getByRole('status').filter({
+        hasText: `Provisional approval recorded by ${approver} (${role}). Awaiting a different Director.`,
+      })
+    ).toBeVisible();
   }
 
   async expectPendingApproval(invoiceId: string, customerName: string) {
@@ -49,6 +70,15 @@ export class InvoiceApprovalPage {
       .getByRole('listitem')
       .filter({ hasText: invoiceId });
     await expect(pendingInvoice).toBeVisible();
+  }
+
+  async expectApproved(invoiceId: string, customerName: string) {
+    await this.page.getByRole('tab', { name: 'Invoices' }).click();
+    const invoiceRow = this.page
+      .getByRole('row')
+      .filter({ hasText: customerName });
+    await expect(invoiceRow.getByRole('cell').nth(3)).toHaveText('Approved');
+    await expect(invoiceRow).toContainText(invoiceId);
   }
 
   async getAuthenticatedInvoice(invoiceId: string) {

@@ -18,7 +18,10 @@ public class ApprovalsController : ApiControllerBase
     public record RejectRequest(string Reason);
 
     [HttpPost("{invoiceId}/approve")]
-    [RequireRole("Manager", "Director")]
+    [RequireRole(
+        "Manager",
+        "Director",
+        ForbiddenMessage = "A Manager or Director role is required to approve the invoice.")]
     public ActionResult<Invoice> Approve(string invoiceId) =>
         Handle(() =>
         {

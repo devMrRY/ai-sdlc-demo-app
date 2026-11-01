@@ -14,13 +14,20 @@ public class RequireRoleAttribute : ActionFilterAttribute
         _roles = roles;
     }
 
+    public string? ForbiddenMessage { get; set; }
+
     public override void OnActionExecuting(ActionExecutingContext context)
     {
         var session = context.HttpContext.Items[HttpContextExtensions.SessionKey] as UserSession;
 
         if (session is null || !_roles.Contains(session.Role))
         {
-            context.Result = new StatusCodeResult(StatusCodes.Status403Forbidden);
+            context.Result = ForbiddenMessage is null
+                ? new StatusCodeResult(StatusCodes.Status403Forbidden)
+                : new ObjectResult(new { error = ForbiddenMessage })
+                {
+                    StatusCode = StatusCodes.Status403Forbidden,
+                };
         }
     }
 }

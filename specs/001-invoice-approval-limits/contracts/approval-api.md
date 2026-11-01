@@ -11,9 +11,18 @@ The repository currently exposes:
 
 Current contract:
 - Request body: none
-- Authenticated identity: read from `HttpContext.GetSession().Username`
+- Authenticated identity and role: read from `HttpContext.GetSession()`
 - Controller method: `Approve(string invoiceId)`
-- Domain call: `ApprovalService.Approve(invoiceId, HttpContext.GetSession().Username)`
+- Domain call: `ApprovalService.Approve(invoiceId, session.Username, session.Role)`
+
+The same endpoint is called for both approval steps. The domain service determines whether a call is the first or second approval from the invoice's persisted `ApprovalHistory`; the client does not provide an approval stage, username, or role.
+
+For an invoice above `500,000`:
+- The first call from an authenticated Manager or Director records that session's username, role, and timestamp as a provisional approval and returns the invoice as `PendingApproval`. `DecidedBy` and `DecidedAt` remain unset.
+- A later call by a distinct authenticated Director records the second approval and transitions the invoice to `Approved`. Final-decision metadata identifies this second Director.
+- Invalid second approvals return the existing business-rule error response and preserve invoice state and approval history.
+
+For an invoice at or below `500,000`, a valid Manager or Director call remains an independent single approval under the existing limits and finalizes the invoice.
 
 ### Reject endpoint
 
@@ -23,25 +32,6 @@ Current contract:
 - Authenticated identity: read from `HttpContext.GetSession().Username`
 - Controller method: `Reject(string invoiceId, RejectRequest request)`
 - Domain call: `ApprovalService.Reject(invoiceId, HttpContext.GetSession().Username, request.Reason)`
-
-## Planned evolution for this feature
-
-The feature adds a two-approver approval flow for invoices above `500,000`. The API contract must be extended in a server-authoritative and authenticated manner without trusting client-supplied usernames as identity proofs.
-
-Required design principle:
-- The authenticated session must be the source of truth for the current approver’s identity.
-- Any second approver must be resolved from an authenticated, validated identity and not from a raw client input alone.
-
-## Proposed contract changes
-
-If the implementation requires a multi-approver request body, it should use a typed request object that includes only the required approval metadata and never assumes client trust for identity. The request should at minimum support:
-
-- `firstApprover` or equivalent internal validation source derived from authenticated session
-- `secondApprover` identity validated by the server using a trusted session or user registry
-- approval order metadata for sequence validation
-- invalid or unauthorized attempt handling with clear reasons and no invoice mutation
-
-There is currently no verified second-approver API contract in the repo. The implementation must explicitly define it as part of the feature work and preserve the existing controller layering.
 
 ## HTTP semantics expected by this feature
 
